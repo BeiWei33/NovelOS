@@ -1,0 +1,319 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NovelOS — 所有 UI 原型</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;font-size:14px;line-height:1.5}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:#f8f7f4;color:#1a1a1a}
+
+/* ===== Top Bar ===== */
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #e2dfd7;background:#fff;flex-shrink:0}
+.topbar .logo{font-weight:700;font-size:16px;color:#8b5cf6}
+.topbar .logo span{color:#1a1a1a}
+.topbar-nav{display:flex;gap:4px;margin-left:20px;flex:1}
+.topbar-nav a{color:#6b6b6b;text-decoration:none;padding:4px 10px;border-radius:4px;font-size:13px;cursor:pointer;transition:.15s}
+.topbar-nav a:hover{background:#e8e5df;color:#1a1a1a}
+.topbar-nav a.active{color:#8b5cf6;font-weight:500;background:#ede9fe}
+.avatar{width:28px;height:28px;border-radius:50%;background:#ede9fe;color:#8b5cf6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+
+/* ===== Theme Toggle ===== */
+.theme-btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:100px;background:#fff;border:1px solid #e2dfd7;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:9999;font-size:13px;user-select:none;cursor:pointer;transition:.15s}
+.theme-btn:hover{background:#f2f0ec}
+body.dark .theme-btn{background:#1a1a1a;border-color:#2a2a2a;color:#e5e5e5}
+body.dark .theme-btn:hover{background:#252525}
+
+/* ===== Pages ===== */
+.page{display:none;flex:1;overflow-y:auto}
+.page.active{display:block}
+
+/* ===== Shared ===== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{border-radius:3px;background:#e2dfd7}
+body.dark ::-webkit-scrollbar-thumb{background:#2a2a2a}
+
+/* ===== Dashboard ===== */
+.dash{padding:32px 48px;max-width:960px;margin:0 auto}
+.dash h1{font-size:22px;font-weight:700;margin-bottom:24px}
+.dash .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px}
+.dash .card{background:#fff;border-radius:10px;border:1px solid #e2dfd7;padding:20px;transition:.15s}
+.dash .card:hover{border-color:#c4b5fd;box-shadow:0 2px 8px rgba(139,92,246,.08)}
+.dash .card .num{font-size:28px;font-weight:700;color:#8b5cf6}
+.dash .card .label{font-size:13px;color:#6b6b6b;margin-top:4px}
+.dash .card .sub{font-size:12px;color:#9a9a9a;margin-top:8px}
+.dash .section-title{font-size:15px;font-weight:600;margin-bottom:12px}
+.dash .recent{background:#fff;border-radius:10px;border:1px solid #e2dfd7;overflow:hidden}
+.dash .recent .item{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #e2dfd7;cursor:pointer;transition:.1s}
+.dash .recent .item:last-child{border:none}
+.dash .recent .item:hover{background:#f8f7f4}
+.dash .recent .item .name{font-weight:500}
+.dash .recent .item .meta{font-size:12px;color:#9a9a9a}
+.dash .recent .item .status{padding:2px 8px;border-radius:100px;font-size:11px;font-weight:500}
+.dash .recent .item .status.draft{background:#fef3c7;color:#d97706}
+.dash .recent .item .status.published{background:#d1fae5;color:#059669}
+.dash .recent .item .status.editing{background:#ede9fe;color:#7c3aed}
+
+/* ===== Outline ===== */
+.outline{padding:32px 48px;max-width:960px;margin:0 auto}
+.outline h1{font-size:22px;font-weight:700;margin-bottom:24px}
+.outline .chapter-card{background:#fff;border-radius:10px;border:1px solid #e2dfd7;margin-bottom:12px;overflow:hidden;transition:.15s}
+.outline .chapter-card:hover{border-color:#c4b5fd}
+.outline .chapter-card .ch-head{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:.1s}
+.outline .chapter-card .ch-head:hover{background:#f8f7f4}
+.outline .chapter-card .ch-head .ch-title{font-weight:600}
+.outline .chapter-card .ch-head .ch-meta{font-size:12px;color:#9a9a9a}
+.outline .chapter-card .ch-body{padding:0 20px 14px;border-top:1px solid #e2dfd7}
+.outline .scene-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f2f0ec;font-size:13px;cursor:pointer;transition:.1s}
+.outline .scene-row:last-child{border:none}
+.outline .scene-row:hover{background:#f8f7f4;margin:0 -20px;padding:10px 20px}
+.outline .scene-row .goal{color:#6b6b6b;font-size:12px;flex:1;margin:0 12px}
+.outline .scene-row .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.outline .scene-row .status-dot.done{background:#059669}
+.outline .scene-row .status-dot.wip{background:#d97706}
+.outline .scene-row .status-dot.todo{background:#d1d5db}
+
+/* ===== AI Panel ===== */
+.ai-page{padding:32px 48px;max-width:720px;margin:0 auto}
+.ai-page h1{font-size:22px;font-weight:700;margin-bottom:24px}
+.ai-page .context-badge{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.ai-page .context-badge span{padding:4px 10px;border-radius:100px;font-size:12px;background:#ede9fe;color:#7c3aed}
+.ai-page .context-badge span.muted{background:#f2f0ec;color:#6b6b6b}
+.ai-page .chat-box{background:#fff;border-radius:10px;border:1px solid #e2dfd7;overflow:hidden}
+.ai-page .chat-box .msg{padding:16px 20px;border-bottom:1px solid #e2dfd7}
+.ai-page .chat-box .msg:last-child{border:none}
+.ai-page .chat-box .msg .who{font-size:12px;font-weight:600;margin-bottom:4px}
+.ai-page .chat-box .msg .who.ai{color:#8b5cf6}
+.ai-page .chat-box .msg .who.user{color:#1a1a1a}
+.ai-page .chat-box .msg .text{font-size:14px;line-height:1.7;color:#4b4b4b}
+.ai-page .chat-box .msg .actions{display:flex;gap:6px;margin-top:8px}
+.ai-page .chat-box .msg .actions button{padding:4px 10px;border-radius:4px;border:1px solid #e2dfd7;background:transparent;font-size:12px;cursor:pointer;color:#6b6b6b;transition:.15s}
+.ai-page .chat-box .msg .actions button:hover{background:#f2f0ec;color:#1a1a1a}
+.ai-page .chat-box .msg .actions button.primary{background:#8b5cf6;color:#fff;border-color:#8b5cf6}
+.ai-page .chat-box .msg .actions button.primary:hover{background:#7c3aed}
+.ai-page .input-row{display:flex;gap:8px;margin-top:12px}
+.ai-page .input-row input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid #e2dfd7;font-size:14px;outline:none;transition:.15s;background:#fff}
+.ai-page .input-row input:focus{border-color:#8b5cf6;box-shadow:0 0 0 2px rgba(139,92,246,.15)}
+.ai-page .input-row button{padding:10px 20px;border-radius:8px;border:none;background:#8b5cf6;color:#fff;font-weight:500;cursor:pointer;font-size:14px;transition:.15s}
+.ai-page .input-row button:hover{background:#7c3aed}
+
+/* ===== Settings ===== */
+.settings{padding:32px 48px;max-width:960px;margin:0 auto}
+.settings h1{font-size:22px;font-weight:700;margin-bottom:24px}
+.settings .tabs{display:flex;gap:0;border-bottom:1px solid #e2dfd7;margin-bottom:24px}
+.settings .tabs button{padding:8px 16px;border:none;background:transparent;color:#6b6b6b;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
+.settings .tabs button.act{color:#8b5cf6;border-bottom-color:#8b5cf6;font-weight:500}
+.settings .section{background:#fff;border-radius:10px;border:1px solid #e2dfd7;padding:24px;margin-bottom:16px}
+.settings .section h3{font-size:15px;font-weight:600;margin-bottom:16px}
+.settings .field{display:flex;align-items:flex-start;margin-bottom:16px;gap:16px}
+.settings .field:last-child{margin-bottom:0}
+.settings .field .fl{width:100px;font-size:13px;color:#6b6b6b;padding-top:6px;flex-shrink:0}
+.settings .field .fv{flex:1}
+.settings .field input[type="text"],.settings .field textarea{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #e2dfd7;font-size:13px;outline:none;transition:.15s;background:#fff;font-family:inherit}
+.settings .field input[type="text"]:focus,.settings .field textarea:focus{border-color:#8b5cf6;box-shadow:0 0 0 2px rgba(139,92,246,.15)}
+.settings .field textarea{min-height:60px;resize:vertical}
+.settings .field input[type="range"]{width:100%;accent-color:#8b5cf6}
+.settings .field .range-label{font-size:12px;color:#6b6b6b;margin-top:4px}
+.settings .char-card{display:flex;gap:16px;padding:12px;border-radius:8px;border:1px solid #e2dfd7;margin-bottom:8px;cursor:pointer;transition:.15s}
+.settings .char-card:hover{border-color:#c4b5fd;background:#f8f7f4}
+.settings .char-card .avatar-lg{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;flex-shrink:0}
+.settings .char-card .info{flex:1}
+.settings .char-card .info .name{font-weight:500}
+.settings .char-card .info .desc{font-size:12px;color:#6b6b6b;margin-top:2px}
+.settings .char-card .info .tags{display:flex;gap:4px;margin-top:4px}
+.settings .char-card .info .tags span{padding:2px 6px;border-radius:4px;font-size:11px;background:#f2f0ec;color:#6b6b6b}
+
+/* ===== Dark ===== */
+body.dark{background:#0f0f0f;color:#e5e5e5}
+body.dark .topbar{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .topbar .logo span{color:#e5e5e5}
+body.dark .topbar-nav a{color:#888}
+body.dark .topbar-nav a:hover{background:#252525;color:#e5e5e5}
+body.dark .topbar-nav a.active{background:#1e1a2e;color:#a78bfa}
+body.dark .dash .card{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .dash .card .label{color:#888}
+body.dark .dash .card .sub{color:#666}
+body.dark .dash .recent{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .dash .recent .item{border-color:#2a2a2a}
+body.dark .dash .recent .item:hover{background:#141414}
+body.dark .dash .recent .item .meta{color:#666}
+body.dark .outline .chapter-card{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .outline .chapter-card .ch-head:hover{background:#141414}
+body.dark .outline .chapter-card .ch-body{border-color:#2a2a2a}
+body.dark .outline .scene-row:hover{background:#141414}
+body.dark .outline .scene-row .goal{color:#888}
+body.dark .ai-page .chat-box{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .ai-page .chat-box .msg{border-color:#2a2a2a}
+body.dark .ai-page .chat-box .msg .who.user{color:#e5e5e5}
+body.dark .ai-page .chat-box .msg .text{color:#aaa}
+body.dark .ai-page .input-row input{background:#1a1a1a;border-color:#2a2a2a;color:#e5e5e5}
+body.dark .ai-page .context-badge span.muted{background:#252525;color:#888}
+body.dark .ai-page .chat-box .msg .actions button{border-color:#2a2a2a;color:#888}
+body.dark .ai-page .chat-box .msg .actions button:hover{background:#252525;color:#e5e5e5}
+body.dark .settings .section{background:#1a1a1a;border-color:#2a2a2a}
+body.dark .settings .field .fl{color:#888}
+body.dark .settings .field input,.dark .settings .field textarea{background:#1a1a1a;border-color:#2a2a2a;color:#e5e5e5}
+body.dark .settings .field input:focus,.dark .settings .field textarea:focus{border-color:#a78bfa;box-shadow:0 0 0 2px rgba(167,139,250,.15)}
+body.dark .settings .char-card{border-color:#2a2a2a}
+body.dark .settings .char-card:hover{border-color:#7c3aed;background:#141414}
+body.dark .settings .char-card .info .desc{color:#888}
+body.dark .settings .char-card .info .tags span{background:#252525;color:#888}
+body.dark .tabs{border-color:#2a2a2a}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left" style="display:flex;align-items:center;gap:12px;flex:1">
+    <div class="logo">Novel<span>OS</span></div>
+    <div class="topbar-nav">
+      <a class="active" onclick="switchPage('dashboard',this)">仪表盘</a>
+      <a onclick="switchPage('outline',this)">大纲</a>
+      <a onclick="switchPage('ai',this)">AI 助手</a>
+      <a onclick="switchPage('settings',this)">设定</a>
+    </div>
+  </div>
+  <div class="avatar">李</div>
+</div>
+
+<!-- Dashboard -->
+<div class="page active" id="page-dashboard">
+  <div class="dash">
+    <h1>我的作品</h1>
+    <div class="grid">
+      <div class="card"><div class="num">3</div><div class="label">进行中作品</div><div class="sub">《迷雾之城》《旧日回响》《暗流》</div></div>
+      <div class="card"><div class="num">12,847</div><div class="label">今日总字数</div><div class="sub">相比昨天 +2,341</div></div>
+      <div class="card"><div class="num">92%</div><div class="label">完成度</div><div class="sub">第一章已完结，第二章 60%</div></div>
+    </div>
+    <div class="section-title">最近写作</div>
+    <div class="recent">
+      <div class="item"><div><div class="name">第一章 迷雾之城 · 深夜的火车</div><div class="meta">5 分钟前 · 正在编辑</div></div><span class="status editing">编辑中</span></div>
+      <div class="item"><div><div class="name">第一章 迷雾之城 · 废弃车站</div><div class="meta">昨天 22:15 · 草稿</div></div><span class="status draft">草稿</span></div>
+      <div class="item"><div><div class="name">第二章 旧日回响 · 档案室</div><div class="meta">昨天 14:30 · 草稿</div></div><span class="status draft">草稿</span></div>
+      <div class="item"><div><div class="name">第三章 暗流涌动 · 开端</div><div class="meta">前天 09:00 · 已发布</div></div><span class="status published">已发布</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Outline -->
+<div class="page" id="page-outline">
+  <div class="outline">
+    <h1>大纲 · 迷雾之城</h1>
+    <div class="chapter-card">
+      <div class="ch-head"><div><div class="ch-title">第一章 迷雾之城</div><div class="ch-meta">3 场景 · 2,841 字</div></div><span style="font-size:12px;color:#6b6b6b">完成</span></div>
+      <div class="ch-body">
+        <div class="scene-row"><span class="status-dot done"></span><span style="margin-left:8px;font-weight:500">深夜的火车</span><span class="goal">建立悬疑氛围，引入林川</span><span style="font-size:12px;color:#9a9a9a">1,024 字</span></div>
+        <div class="scene-row"><span class="status-dot done"></span><span style="margin-left:8px;font-weight:500">陌生人的来信</span><span class="goal">神秘女人递来一封信，埋下伏笔</span><span style="font-size:12px;color:#9a9a9a">890 字</span></div>
+        <div class="scene-row"><span class="status-dot wip"></span><span style="margin-left:8px;font-weight:500">废弃车站</span><span class="goal">到达雾城，发现车站空无一人</span><span style="font-size:12px;color:#9a9a9a">927 字</span></div>
+      </div>
+    </div>
+    <div class="chapter-card">
+      <div class="ch-head"><div><div class="ch-title">第二章 旧日回响</div><div class="ch-meta">2 场景 · 1,923 字 · 写作中</div></div><span style="font-size:12px;color:#6b6b6b">60%</span></div>
+      <div class="ch-body">
+        <div class="scene-row"><span class="status-dot done"></span><span style="margin-left:8px;font-weight:500">档案室</span><span class="goal">林川查阅三年前的案件记录</span><span style="font-size:12px;color:#9a9a9a">1,023 字</span></div>
+        <div class="scene-row"><span class="status-dot wip"></span><span style="margin-left:8px;font-weight:500">深夜通话</span><span class="goal">神秘来电揭开往事一角</span><span style="font-size:12px;color:#9a9a9a">900 字</span></div>
+      </div>
+    </div>
+    <div class="chapter-card">
+      <div class="ch-head"><div><div class="ch-title">第三章 暗流涌动</div><div class="ch-meta">0 场景 · 草稿</div></div><span style="font-size:12px;color:#6b6b6b">未开始</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Assistant -->
+<div class="page" id="page-ai">
+  <div class="ai-page">
+    <h1>AI 写作助手</h1>
+    <div class="context-badge">
+      <span>迷雾之城 · 深夜的火车</span>
+      <span class="muted">当前场景</span>
+      <span class="muted">林川 · 神秘女人登场</span>
+    </div>
+    <div class="chat-box">
+      <div class="msg">
+        <div class="who ai">写作助手</div>
+        <div class="text">当前场景"深夜的火车"氛围铺垫不错。我有一个建议：可以在列车刹车前多加一句环境描写——比如车窗外的灯光突然消失的细节，让黑暗更突然。需要我帮你改写这一段吗？</div>
+        <div class="actions"><button class="primary">帮我改写</button><button>给建议</button><button>跳过</button></div>
+      </div>
+      <div class="msg">
+        <div class="who user">你</div>
+        <div class="text">我觉得神秘女人的台词可以更有张力。她说的"不是疯子就是——"后面本来想说什么？增加一些她对林川的试探？</div>
+      </div>
+      <div class="msg">
+        <div class="who ai">写作助手</div>
+        <div class="text">好想法。这里可以加一层心理博弈——她故意留白，看林川的反应。林川的沉默本身就是一种回应。我可以给出几个改写方案。<br/><br/>方案一（含蓄）：她顿了顿，"——不，你是来找答案的。"<br/>方案二（压迫感）："——但你不一样。你身上的东西，它在说话。"<br/>方案三（悬念）：她微微一笑，"算了，你会知道的。"</div>
+        <div class="actions"><button class="primary">采用方案一</button><button>方案二</button><button>方案三</button><button>再想几个</button></div>
+      </div>
+    </div>
+    <div class="input-row">
+      <input type="text" placeholder="输入你的想法或问题..." />
+      <button>发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="page" id="page-settings">
+  <div class="settings">
+    <h1>设定管理 · 迷雾之城</h1>
+    <div class="tabs">
+      <button class="act">人物</button>
+      <button>世界观</button>
+      <button>写作风格</button>
+      <button>记忆</button>
+    </div>
+    <div class="section">
+      <h3>人物列表</h3>
+      <div class="char-card">
+        <div class="avatar-lg" style="background:#ede9fe;color:#8b5cf6">林</div>
+        <div class="info">
+          <div class="name">林川</div>
+          <div class="desc">主角 · 28岁 · 前刑警 · 因三年前案件辞职</div>
+          <div class="tags"><span>沉默寡言</span><span>观察力强</span><span>怕黑</span></div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="avatar-lg" style="background:#fce4ec;color:#e91e63">?</div>
+        <div class="info">
+          <div class="name">神秘女人 · 苏晚</div>
+          <div class="desc">身份不明 · 在火车上主动接近林川 · 似乎知道内情</div>
+          <div class="tags"><span>神秘</span><span>知情人</span><span>语言犀利</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <h3>写作风格</h3>
+      <div class="field"><div class="fl">对话比例</div><div class="fv"><input type="range" min="0" max="100" value="45" /><div class="range-label">45%</div></div></div>
+      <div class="field"><div class="fl">句子长度</div><div class="fv"><input type="range" min="0" max="100" value="30" /><div class="range-label">偏短句</div></div></div>
+      <div class="field"><div class="fl">心理描写</div><div class="fv"><input type="range" min="0" max="100" value="20" /><div class="range-label">低心理描写</div></div></div>
+      <div class="field"><div class="fl">氛围标签</div><div class="fv" style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag" style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;background:#f2f0ec;cursor:pointer">悬疑</span><span class="tag" style="background:#ede9fe;color:#8b5cf6">都市</span><span class="tag" style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;background:#f2f0ec;cursor:pointer">慢热</span></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="theme-btn" id="themeBtn" onclick="toggleTheme()">&#9679; 切换到深色</div>
+
+<script>
+var dark = false;
+
+function switchPage(name, el) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.topbar-nav a').forEach(function(a) { a.classList.remove('active'); });
+  if (el) el.classList.add('active');
+}
+
+function toggleTheme() {
+  dark = !dark;
+  if (dark) {
+    document.body.classList.add('dark');
+    document.getElementById('themeBtn').innerHTML = '&#9670; 切换到亮色';
+  } else {
+    document.body.classList.remove('dark');
+    document.getElementById('themeBtn').innerHTML = '&#9679; 切换到深色';
+  }
+}
+</script>
+</body>
+</html>

@@ -143,6 +143,7 @@ function SceneEditor({
 }) {
   const [blocks, setBlocks] = useState(scene.document.blocks);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState("");
 
   async function handleSave() {
@@ -158,6 +159,31 @@ function SceneEditor({
     } finally {
       setSaving(false);
       setTimeout(() => setMessage(""), 2000);
+    }
+  }
+
+  async function handleAiWrite() {
+    setGenerating(true);
+    setMessage("");
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API_BASE}/skills/scene-writer/${scene.id}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      const data = await res.json();
+      setBlocks(data.document.blocks);
+      setMessage("AI 生成完成");
+      await onSave();
+    } catch (e) {
+      setMessage("生成失败");
+      console.error(e);
+    } finally {
+      setGenerating(false);
+      setTimeout(() => setMessage(""), 3000);
     }
   }
 
@@ -231,6 +257,14 @@ function SceneEditor({
           className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
         >
           + 内心
+        </button>
+        <div className="w-px h-5 bg-gray-700 mx-1" />
+        <button
+          onClick={handleAiWrite}
+          disabled={generating}
+          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded text-sm font-medium transition-colors"
+        >
+          {generating ? "生成中..." : "AI 写场景"}
         </button>
         <div className="w-px h-5 bg-gray-700 mx-1" />
         <button
