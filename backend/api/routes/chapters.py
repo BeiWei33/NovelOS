@@ -25,3 +25,10 @@ async def get_chapter(chapter_id: str, db: AsyncSession = Depends(get_session)):
 @router.get("", response_model=list[schemas.ChapterRead])
 async def list_chapters(novel_id: str, db: AsyncSession = Depends(get_session)):
     return await crud.list_chapters(db, novel_id)
+
+
+@router.delete("/{chapter_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chapter(chapter_id: str, db: AsyncSession = Depends(get_session)):
+    deleted = await crud.delete_chapter(db, chapter_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")

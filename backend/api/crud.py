@@ -73,6 +73,15 @@ async def list_chapters(db: AsyncSession, novel_id: str) -> list[Chapter]:
     return list(result.scalars().all())
 
 
+async def delete_chapter(db: AsyncSession, chapter_id: str) -> bool:
+    chapter = await get_chapter(db, chapter_id)
+    if chapter is None:
+        return False
+    await db.delete(chapter)
+    await db.commit()
+    return True
+
+
 # ─── Scene ────────────────────────────────────────────────────────────────────
 
 async def create_scene(db: AsyncSession, data: schemas.SceneCreate) -> Scene:
@@ -155,6 +164,16 @@ async def list_characters(db: AsyncSession, novel_id: str) -> list[Character]:
     return list(result.scalars().all())
 
 
+async def delete_character(db: AsyncSession, character_id: str) -> bool:
+    char = await db.execute(select(Character).where(Character.id == character_id))
+    char = char.scalar_one_or_none()
+    if char is None:
+        return False
+    await db.delete(char)
+    await db.commit()
+    return True
+
+
 # ─── World ────────────────────────────────────────────────────────────────────
 
 async def create_world(db: AsyncSession, data: schemas.WorldCreate) -> World:
@@ -172,6 +191,16 @@ async def list_worlds(db: AsyncSession, novel_id: str) -> list[World]:
     return list(result.scalars().all())
 
 
+async def delete_world(db: AsyncSession, world_id: str) -> bool:
+    world = await db.execute(select(World).where(World.id == world_id))
+    world = world.scalar_one_or_none()
+    if world is None:
+        return False
+    await db.delete(world)
+    await db.commit()
+    return True
+
+
 # ─── Style ────────────────────────────────────────────────────────────────────
 
 async def create_style(db: AsyncSession, data: schemas.StyleCreate) -> Style:
@@ -187,3 +216,13 @@ async def list_styles(db: AsyncSession, novel_id: str) -> list[Style]:
         select(Style).where(Style.novel_id == novel_id)
     )
     return list(result.scalars().all())
+
+
+async def delete_style(db: AsyncSession, style_id: str) -> bool:
+    style = await db.execute(select(Style).where(Style.id == style_id))
+    style = style.scalar_one_or_none()
+    if style is None:
+        return False
+    await db.delete(style)
+    await db.commit()
+    return True

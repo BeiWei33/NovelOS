@@ -21,6 +21,13 @@ async def list_characters(novel_id: str, db: AsyncSession = Depends(get_session)
     return await crud.list_characters(db, novel_id)
 
 
+@router.delete("/characters/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_character(character_id: str, db: AsyncSession = Depends(get_session)):
+    deleted = await crud.delete_character(db, character_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
+
+
 # ─── Worlds ───────────────────────────────────────────────────────────────────
 
 @router.post("/worlds", response_model=schemas.WorldRead, status_code=status.HTTP_201_CREATED)
@@ -33,6 +40,13 @@ async def list_worlds(novel_id: str, db: AsyncSession = Depends(get_session)):
     return await crud.list_worlds(db, novel_id)
 
 
+@router.delete("/worlds/{world_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_world(world_id: str, db: AsyncSession = Depends(get_session)):
+    deleted = await crud.delete_world(db, world_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="World not found")
+
+
 # ─── Styles ───────────────────────────────────────────────────────────────────
 
 @router.post("/styles", response_model=schemas.StyleRead, status_code=status.HTTP_201_CREATED)
@@ -43,3 +57,10 @@ async def create_style(data: schemas.StyleCreate, db: AsyncSession = Depends(get
 @router.get("/styles", response_model=list[schemas.StyleRead])
 async def list_styles(novel_id: str, db: AsyncSession = Depends(get_session)):
     return await crud.list_styles(db, novel_id)
+
+
+@router.delete("/styles/{style_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_style(style_id: str, db: AsyncSession = Depends(get_session)):
+    deleted = await crud.delete_style(db, style_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found")
