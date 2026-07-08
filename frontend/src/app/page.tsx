@@ -1,65 +1,140 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+import type { Novel } from "@/types/domain";
 
 export default function Home() {
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [title, setTitle] = useState("");
+
+  async function loadNovels() {
+    setLoading(true);
+    try {
+      const res = await api.listNovels();
+      setNovels(res.novels);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadNovels();
+  }, []);
+
+  async function handleCreate() {
+    if (!title.trim()) return;
+    try {
+      await api.createNovel(title.trim());
+      setTitle("");
+      setShowCreate(false);
+      await loadNovels();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`确定删除「${name}」？`)) return;
+    try {
+      await api.deleteNovel(id);
+      await loadNovels();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      <header className="border-b border-gray-800 px-6 py-4">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <h1 className="text-xl font-bold tracking-tight">NovelOS</h1>
+          <span className="text-xs text-gray-500">AI Writer IDE</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold">我的小说</h2>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            + 新建小说
+          </button>
         </div>
+
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">加载中...</div>
+        ) : novels.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+            <p className="text-lg mb-2">还没有小说</p>
+            <p className="text-sm">点击上方按钮创建你的第一部作品</p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {novels.map((novel) => (
+              <div
+                key={novel.id}
+                className="flex items-center justify-between p-4 bg-gray-900 border border-gray-800 rounded-lg hover:border-gray-700 transition-colors group"
+              >
+                <a
+                  href={`/novels/${novel.id}`}
+                  className="font-medium text-lg hover:text-indigo-400 transition-colors"
+                >
+                  {novel.title}
+                </a>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-600">
+                    {new Date(novel.updated_at).toLocaleDateString("zh-CN")}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(novel.id, novel.title)}
+                    className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all text-sm"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
+
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">新建小说</h3>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              placeholder="输入小说标题"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500 mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowCreate(false); setTitle(""); }}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!title.trim()}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+              >
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
