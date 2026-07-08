@@ -3,6 +3,7 @@ Artifact and data pipeline routes.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.session import get_session
@@ -45,7 +46,7 @@ async def build_projections(
 
     # Check artifact exists
     art_result = await db.execute(
-        __import__("sqlalchemy").select(SceneArtifact).where(SceneArtifact.scene_id == scene_id)
+        sa_select(SceneArtifact).where(SceneArtifact.scene_id == scene_id)
     )
     artifact = art_result.scalar_one_or_none()
     if artifact is None:
