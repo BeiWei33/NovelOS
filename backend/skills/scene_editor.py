@@ -10,9 +10,10 @@ import json
 import time
 from typing import Any
 
-from core.types import SkillManifest, ExecutionProfile
+from core.types import SkillManifest
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.profile_registry import profile_registry
 from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
 
@@ -78,18 +79,12 @@ SCENE_EDITOR_MANIFEST = SkillManifest(
     ],
 )
 
-SCENE_EDITOR_PROFILE = ExecutionProfile(
-    provider="openai",
-    model="gpt-4o",
-    temperature=0.3,  # 低温度，更精确的修改
-    max_tokens=1024,
-)
-
 
 class SceneEditorSkill(Skill):
     manifest = SCENE_EDITOR_MANIFEST
 
     async def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        profile = profile_registry.get(self.manifest.role)
         prompt = render_template(self.manifest.template, {
             "document": json.dumps(context.get("document", {"blocks": []}), ensure_ascii=False),
             "rules": DESLOP_RULES,
@@ -105,7 +100,7 @@ class SceneEditorSkill(Skill):
         ]
 
         start = time.time()
-        response = await router.execute(messages, SCENE_EDITOR_PROFILE)
+        response = await router.execute(messages, profile)
         elapsed_ms = int((time.time() - start) * 1000)
 
         patches = parse_list_from_response(response, "patches")
@@ -114,9 +109,9 @@ class SceneEditorSkill(Skill):
             "patches": patches,
             "provenance": {
                 "execution_role": self.manifest.role,
-                "provider": SCENE_EDITOR_PROFILE.provider,
-                "model": SCENE_EDITOR_PROFILE.model,
-                "temperature": SCENE_EDITOR_PROFILE.temperature,
+                "provider": profile.provider,
+                "model": profile.model,
+                "temperature": profile.temperature,
                 "tokens": 0,
                 "duration_ms": elapsed_ms,
                 "rules_applied": [r["id"] for r in DESLOP_RULES],

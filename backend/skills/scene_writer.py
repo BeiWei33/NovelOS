@@ -13,9 +13,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from core.types import SkillManifest, ExecutionProfile
+from core.types import SkillManifest
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.profile_registry import profile_registry
 from prompts.builder import render_template
 from database.models.canonical import (
     Scene, Character, World, Style, Novel,
@@ -36,18 +37,12 @@ SCENE_WRITER_MANIFEST = SkillManifest(
     ],
 )
 
-SCENE_WRITER_PROFILE = ExecutionProfile(
-    provider="openai",
-    model="gpt-4o",
-    temperature=0.7,
-    max_tokens=2048,
-)
-
 
 class SceneWriterSkill(Skill):
     manifest = SCENE_WRITER_MANIFEST
 
     async def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        profile = profile_registry.get(self.manifest.role)
         prompt = render_template(self.manifest.template, context)
 
         messages = [
@@ -59,7 +54,7 @@ class SceneWriterSkill(Skill):
         ]
 
         start = time.time()
-        response = await router.execute(messages, SCENE_WRITER_PROFILE)
+        response = await router.execute(messages, profile)
         elapsed_ms = int((time.time() - start) * 1000)
 
         # Parse JSON from response
@@ -69,10 +64,10 @@ class SceneWriterSkill(Skill):
             "document": {"blocks": blocks},
             "provenance": {
                 "execution_role": self.manifest.role,
-                "execution_profile": SCENE_WRITER_PROFILE.model,
-                "provider": SCENE_WRITER_PROFILE.provider,
-                "model": SCENE_WRITER_PROFILE.model,
-                "temperature": SCENE_WRITER_PROFILE.temperature,
+                "execution_profile": profile.model,
+                "provider": profile.provider,
+                "model": profile.model,
+                "temperature": profile.temperature,
                 "tokens": 0,
                 "duration_ms": elapsed_ms,
                 "version": "1",

@@ -1,0 +1,48 @@
+# Example profiles.yaml
+# Copy this file to backend/profiles.yaml and customize
+#
+# This file allows you to configure which LLM model each skill uses.
+# Changes take effect after restarting the backend service.
+
+profiles:
+  # Story Planner - plans scene structure before writing
+  story-planner:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 2048
+
+  # Scene Writer - generates scene content
+  scene-writer:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 2048
+
+  # Scene Editor - AI editing to remove AI-style writing
+  scene-editor:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.3  # Lower temperature for precise edits
+    max_tokens: 1024
+
+  # Consistency Checker - checks character/timeline consistency
+  consistency-checker:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.2  # Low temperature for accurate checking
+    max_tokens: 1024
+
+  # Example: Use GLM for scene writing
+  # scene-writer:
+  #   provider: glm
+  #   model: glm-4-plus
+  #   temperature: 0.7
+  #   max_tokens: 4096
+
+  # Example: Use Ollama for local development
+  # story-planner:
+  #   provider: ollama
+  #   model: llama3
+  #   temperature: 0.7
+  #   max_tokens: 2048

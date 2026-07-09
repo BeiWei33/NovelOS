@@ -57,10 +57,12 @@ class TestSkills:
         assert len(registry.get_by_role("test-role")) == 1
 
     def test_scene_writer_manifest(self):
-        from skills.scene_writer import SCENE_WRITER_MANIFEST, SCENE_WRITER_PROFILE
+        from skills.scene_writer import SCENE_WRITER_MANIFEST
+        from skills.profile_registry import profile_registry
         assert SCENE_WRITER_MANIFEST.name == "SceneWriter"
         assert SCENE_WRITER_MANIFEST.role == "scene-writer"
-        assert SCENE_WRITER_PROFILE.model == "gpt-4o"
+        profile = profile_registry.get("scene-writer")
+        assert profile.model == "gpt-4o"
 
     def test_template_rendering(self):
         from prompts.builder import render_template

@@ -13,9 +13,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from core.types import SkillManifest, ExecutionProfile
+from core.types import SkillManifest
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.profile_registry import profile_registry
 from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
 from database.models.canonical import Character, World
@@ -34,18 +35,12 @@ CONSISTENCY_CHECKER_MANIFEST = SkillManifest(
     ],
 )
 
-CONSISTENCY_CHECKER_PROFILE = ExecutionProfile(
-    provider="openai",
-    model="gpt-4o",
-    temperature=0.2,  # 低温度，更精确的检查
-    max_tokens=1024,
-)
-
 
 class ConsistencyCheckerSkill(Skill):
     manifest = CONSISTENCY_CHECKER_MANIFEST
 
     async def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        profile = profile_registry.get(self.manifest.role)
         prompt = render_template(self.manifest.template, {
             "document": json.dumps(context.get("document", {"blocks": []}), ensure_ascii=False),
             "characters": context.get("characters", []),
@@ -62,7 +57,7 @@ class ConsistencyCheckerSkill(Skill):
         ]
 
         start = time.time()
-        response = await router.execute(messages, CONSISTENCY_CHECKER_PROFILE)
+        response = await router.execute(messages, profile)
         elapsed_ms = int((time.time() - start) * 1000)
 
         issues = parse_list_from_response(response, "issues")
@@ -71,9 +66,9 @@ class ConsistencyCheckerSkill(Skill):
             "issues": issues,
             "provenance": {
                 "execution_role": self.manifest.role,
-                "provider": CONSISTENCY_CHECKER_PROFILE.provider,
-                "model": CONSISTENCY_CHECKER_PROFILE.model,
-                "temperature": CONSISTENCY_CHECKER_PROFILE.temperature,
+                "provider": profile.provider,
+                "model": profile.model,
+                "temperature": profile.temperature,
                 "tokens": 0,
                 "duration_ms": elapsed_ms,
             },

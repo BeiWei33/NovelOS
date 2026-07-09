@@ -8,12 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import novels, chapters, scenes, resources, skills, pipeline, samples
 from core.config import settings
 from skills.providers import init_providers
+from skills.profile_registry import init_profiles
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup — initialize LLM providers
+    # Startup — initialize LLM providers and profiles
     init_providers()
+    init_profiles()
     yield
     # Shutdown
 

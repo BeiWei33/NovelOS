@@ -13,9 +13,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from core.types import SkillManifest, ExecutionProfile
+from core.types import SkillManifest
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.profile_registry import profile_registry
 from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
 from database.models.canonical import Scene, Character, World, Style, Chapter
@@ -34,18 +35,12 @@ STORY_PLANNER_MANIFEST = SkillManifest(
     ],
 )
 
-STORY_PLANNER_PROFILE = ExecutionProfile(
-    provider="openai",
-    model="gpt-4o",
-    temperature=0.7,
-    max_tokens=2048,
-)
-
 
 class StoryPlannerSkill(Skill):
     manifest = STORY_PLANNER_MANIFEST
 
     async def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        profile = profile_registry.get(self.manifest.role)
         prompt = render_template(self.manifest.template, context)
 
         messages = [
@@ -57,7 +52,7 @@ class StoryPlannerSkill(Skill):
         ]
 
         start = time.time()
-        response = await router.execute(messages, STORY_PLANNER_PROFILE)
+        response = await router.execute(messages, profile)
         elapsed_ms = int((time.time() - start) * 1000)
 
         scene_plan = parse_list_from_response(response, "scene_plan")
@@ -66,9 +61,9 @@ class StoryPlannerSkill(Skill):
             "scene_plan": scene_plan,
             "provenance": {
                 "execution_role": self.manifest.role,
-                "provider": STORY_PLANNER_PROFILE.provider,
-                "model": STORY_PLANNER_PROFILE.model,
-                "temperature": STORY_PLANNER_PROFILE.temperature,
+                "provider": profile.provider,
+                "model": profile.model,
+                "temperature": profile.temperature,
                 "tokens": 0,
                 "duration_ms": elapsed_ms,
             },
