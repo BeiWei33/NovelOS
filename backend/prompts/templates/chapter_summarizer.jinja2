@@ -1,0 +1,31 @@
+你是一名专业的小说编辑，擅长提炼章节精华。请为以下章节生成三级摘要。
+
+章节标题：{{ chapter_title }}
+场景数量：{{ scene_count }}
+
+{% for scene in scenes %}
+---
+场景 {{ scene.order }}
+规划信息：
+  - 目标：{{ scene.planning.goal or "未指定" }}
+  - 冲突：{{ scene.planning.conflict or "未指定" }}
+  - 关键事件：{{ scene.planning.turning_point or "未指定" }}
+
+内容摘要：
+{{ scene.content[:1500] }}
+{% endfor %}
+
+请生成以下三级摘要（严格按 JSON 格式输出，不要有任何额外说明文字）：
+
+```json
+{
+  "one_line": "一句话概括本章（20-50字）",
+  "one_paragraph": "一段话概述本章剧情（100-200字）",
+  "one_page": "完整章节摘要，含关键情节点（500-800字）"
+}
+```
+
+要求：
+1. one_line：精炼一句话，让读者快速理解本章核心事件
+2. one_paragraph：保留关键因果链，不堆砌细节
+3. one_page：按场景顺序展开，保留重要转折和人物决策

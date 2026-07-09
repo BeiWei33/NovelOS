@@ -18,7 +18,10 @@ from database.models.canonical import Scene, Chapter
 from skills.base import registry
 from skills.story_planner import build_story_planner_context
 from skills.scene_writer import build_scene_writer_context
+from skills.chapter_summarizer import build_chapter_summarizer_context
 from workflow.quality_pipeline import run_quality_pipeline, apply_patches
+from workflow.consistency_score import calculate_consistency_score, get_consistency_level
+from workflow.facts_aggregator import run_facts_aggregator
 from services.artifact_service import run_artifact_service, run_projection_builder
 
 
@@ -27,6 +30,7 @@ class WorkflowStep(str, Enum):
     WRITE_SCENES = "write_scenes"
     QUALITY_CHECK = "quality_check"
     ARTIFACTS = "artifacts"
+    FACTS = "facts"
     SUMMARY = "summary"
     COMPLETE = "complete"
     FAILED = "failed"
@@ -41,7 +45,7 @@ class ChapterWorkflowEngine:
         self.current_step = WorkflowStep.PLAN
         self.progress: dict[str, Any] = {
             "step": "plan",
-            "total_steps": 5,
+            "total_steps": 6,
             "completed": 0,
             "scenes_written": 0,
             "errors": [],
@@ -63,7 +67,10 @@ class ChapterWorkflowEngine:
             # Step 4: Generate artifacts
             await self._step_artifacts()
 
-            # Step 5: Summarize
+            # Step 5: Aggregate facts
+            await self._step_facts()
+
+            # Step 6: Summarize
             await self._step_summary()
 
             self.current_step = WorkflowStep.COMPLETE
@@ -164,6 +171,7 @@ class ChapterWorkflowEngine:
         )
         scenes = scenes_result.scalars().all()
 
+        all_issues = []
         for scene in scenes:
             result = await run_quality_pipeline(self.db, scene)
             patches = result.get("patches", [])
@@ -172,7 +180,20 @@ class ChapterWorkflowEngine:
                 scene.version += 1
 
             scene.body_history = scene.body_history or {}
-            scene.body_history["quality_issues"] = result.get("issues", [])
+            scene_issues = result.get("issues", [])
+            scene.body_history["quality_issues"] = scene_issues
+
+            # Calculate per-scene consistency score
+            scene_score = calculate_consistency_score(scene_issues)
+            scene.body_history["consistency_score"] = scene_score
+
+            all_issues.extend(scene_issues)
+
+        # Store aggregate issues in chapter
+        chapter = await self.db.get(Chapter, self.chapter_id)
+        if chapter:
+            chapter.consistency = chapter.consistency or {}
+            chapter.consistency["all_issues"] = all_issues
 
         await self.db.commit()
         self.progress["completed"] = 3
@@ -192,18 +213,35 @@ class ChapterWorkflowEngine:
 
         self.progress["completed"] = 4
 
+    async def _step_facts(self) -> None:
+        """Step 5: Aggregate facts from all scene artifacts."""
+        self.progress["step"] = "facts"
+
+        await run_facts_aggregator(self.db, self.chapter_id)
+
+        self.progress["completed"] = 5
+
     async def _step_summary(self) -> None:
-        """Step 5: Generate chapter summary."""
+        """Step 5: Generate chapter summary via LLM."""
         self.progress["step"] = "summary"
 
-        # Simple summary: aggregate scene one-liners
-        scenes_result = await self.db.execute(
-            select(Scene).where(Scene.chapter_id == self.chapter_id).order_by(Scene.order)
-        )
-        scenes = scenes_result.scalars().all()
-
         chapter = await self.db.get(Chapter, self.chapter_id)
-        if chapter:
+        if not chapter:
+            return
+
+        # Use LLM to generate summary
+        skill = registry.get("ChapterSummarizer")
+        if skill:
+            context = await build_chapter_summarizer_context(self.db, chapter)
+            result = await skill.execute(context)
+            chapter.summary = result.get("summary", {})
+        else:
+            # Fallback to simple concatenation
+            scenes_result = await self.db.execute(
+                select(Scene).where(Scene.chapter_id == self.chapter_id).order_by(Scene.order)
+            )
+            scenes = scenes_result.scalars().all()
+
             one_lines = []
             for scene in scenes:
                 doc = scene.document or {}
@@ -217,10 +255,19 @@ class ChapterWorkflowEngine:
                 "one_paragraph": "\n".join(one_lines[:3]),
                 "one_page": "\n\n".join(one_lines),
             }
-            chapter.consistency = {"score": 100, "issues": [], "fixed": []}
+
+        # Calculate chapter-level consistency score
+        all_issues = chapter.consistency.get("all_issues", []) if chapter.consistency else []
+        chapter_score = calculate_consistency_score(all_issues)
+        chapter.consistency = {
+            "score": chapter_score,
+            "level": get_consistency_level(chapter_score),
+            "issues": all_issues,
+            "fixed": [],
+        }
 
         await self.db.commit()
-        self.progress["completed"] = 5
+        self.progress["completed"] = 6
 
     async def _rollback(self) -> None:
         """Rollback to original state."""

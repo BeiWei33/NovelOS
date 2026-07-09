@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     APP_NAME: str = "NovelOS"
 
+    # Default Model
+    DEFAULT_PROVIDER: Optional[str] = None
+    DEFAULT_MODEL: Optional[str] = None
+
     model_config = {"env_file": ".env", "case_sensitive": True}
 
 

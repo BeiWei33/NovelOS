@@ -1,6 +1,6 @@
 ---
 title: 默认模型切换为 deepseek
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

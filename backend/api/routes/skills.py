@@ -21,6 +21,7 @@ from api.schemas import (
 )
 from workflow.quality_pipeline import run_quality_pipeline, apply_patches
 from workflow.chapter_workflow import run_chapter_workflow
+from workflow.facts_aggregator import run_facts_aggregator
 
 
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -133,6 +134,8 @@ async def run_polish(
     db: AsyncSession = Depends(get_session),
 ):
     """Execute quality pipeline: SceneEditor (去AI味) → ConsistencyChecker."""
+    from workflow.consistency_score import calculate_consistency_score, get_consistency_level
+
     scene = await db.get(Scene, scene_id)
     if scene is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene not found")
@@ -151,10 +154,15 @@ async def run_polish(
 
     # Store quality check results in scene
     scene.body_history = scene.body_history or {}
-    scene.body_history["quality_issues"] = result.get("issues", [])
+    issues = result.get("issues", [])
+    scene.body_history["quality_issues"] = issues
     scene.body_history["quality_patches_applied"] = len(patches)
     scene.body_history["quality_editor"] = result.get("editor_provenance", {})
     scene.body_history["quality_checker"] = result.get("checker_provenance", {})
+
+    # Calculate consistency score
+    score = calculate_consistency_score(issues)
+    scene.body_history["consistency_score"] = score
 
     await db.commit()
     await db.refresh(scene)
@@ -164,8 +172,9 @@ async def run_polish(
         "version": scene.version,
         "patches_applied": len(patches),
         "patches": patches,
-        "issues": result.get("issues", []),
-        "issues_count": len(result.get("issues", [])),
+        "issues": issues,
+        "issues_count": len(issues),
+        "consistency_score": score,
     }
 
 
@@ -258,13 +267,46 @@ async def plan_chapter(
     }
 
 
+@router.post("/summarize-chapter/{chapter_id}")
+async def summarize_chapter(
+    chapter_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """Regenerate chapter summary using LLM."""
+    from skills.chapter_summarizer import build_chapter_summarizer_context
+
+    chapter = await db.get(Chapter, chapter_id)
+    if chapter is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
+
+    skill = registry.get("ChapterSummarizer")
+    if skill is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ChapterSummarizer not registered"
+        )
+
+    context = await build_chapter_summarizer_context(db, chapter)
+    result = await skill.execute(context)
+
+    chapter.summary = result.get("summary", {})
+    await db.commit()
+    await db.refresh(chapter)
+
+    return {
+        "chapter_id": chapter.id,
+        "summary": chapter.summary,
+        "provenance": result.get("provenance", {}),
+    }
+
+
 @router.post("/generate-chapter/{chapter_id}")
 async def generate_chapter(
     chapter_id: str,
     data: ScenePlanningInput,
     db: AsyncSession = Depends(get_session),
 ):
-    """Run full chapter workflow: plan → write scenes → quality → artifacts → summary."""
+    """Run full chapter workflow: plan → write scenes → quality → artifacts → facts → summary."""
     chapter = await db.get(Chapter, chapter_id)
     if chapter is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
@@ -280,4 +322,32 @@ async def generate_chapter(
         "summary": chapter.summary,
         "scene_count": len(chapter.scenes) if hasattr(chapter, "scenes") else 0,
         "planning": chapter.planning,
+    }
+
+
+@router.post("/aggregate-facts/{chapter_id}")
+async def aggregate_facts(
+    chapter_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """Aggregate facts from all scene artifacts in a chapter.
+
+    Reads scene_artifact.facts for each scene, groups by fact_type,
+    deduplicates by (actor, target), and writes to chapter.chapter_facts.
+    """
+    chapter = await db.get(Chapter, chapter_id)
+    if chapter is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
+
+    facts = await run_facts_aggregator(db, chapter_id)
+
+    await db.refresh(chapter)
+
+    return {
+        "chapter_id": chapter_id,
+        "chapter_facts": facts,
+        "counts": {
+            fact_type: len(items)
+            for fact_type, items in facts.items()
+        },
     }

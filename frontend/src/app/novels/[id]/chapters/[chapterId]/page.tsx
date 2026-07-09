@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Scene, Style } from "@/types/domain";
+import { captureError } from "@/lib/error";
 
 export default function ChapterDetail() {
   const params = useParams();
@@ -28,9 +29,8 @@ export default function ChapterDetail() {
       const stylesList = await api.listStyles(novelId);
       setStyles(stylesList);
     } catch (e) {
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "load-scenes", novelId, chapterId });
     } finally {
-      setLoading(false);
     }
   }
 
@@ -48,7 +48,7 @@ export default function ChapterDetail() {
       await loadScenes();
       setSelectedScene(scene);
     } catch (e) {
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "create-scene", novelId, chapterId });
     }
   }
 
@@ -64,7 +64,7 @@ export default function ChapterDetail() {
       setGenerateTheme("");
       await loadScenes();
     } catch (e) {
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "generate-chapter", novelId, chapterId });
       alert("整章生成失败，请查看控制台日志");
     } finally {
       setGeneratingChapter(false);
@@ -251,7 +251,9 @@ function SceneEditor({
 
   useEffect(() => {
     if (novelId) {
-      api.listStyles(novelId).then(setStyles).catch(console.error);
+      api.listStyles(novelId).then(setStyles).catch((e) =>
+        captureError(e, { page: "chapter-detail", action: "load-styles", novelId })
+      );
     }
   }, [novelId]);
 
@@ -262,7 +264,7 @@ function SceneEditor({
         const status = await api.getSceneKnowledgeStatus(scene.id);
         setKnowledgeStatus({ status: status.status });
       } catch (e) {
-        console.error("Failed to load knowledge status", e);
+        captureError(e, { page: "chapter-detail", action: "load-knowledge-status", sceneId: scene.id });
       }
     }
     loadKnowledgeStatus();
@@ -277,7 +279,7 @@ function SceneEditor({
       await onSave();
     } catch (e) {
       setMessage("保存失败");
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "save-scene", sceneId: scene.id });
     } finally {
       setSaving(false);
       setTimeout(() => setMessage(""), 2000);
@@ -302,7 +304,7 @@ function SceneEditor({
       await onSave();
     } catch (e) {
       setMessage("生成失败");
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "ai-write", sceneId: scene.id });
     } finally {
       setGenerating(false);
       setTimeout(() => setMessage(""), 3000);
@@ -332,7 +334,7 @@ function SceneEditor({
       await onSave();
     } catch (e) {
       setMessage("润色失败");
-      console.error(e);
+      captureError(e, { page: "chapter-detail", action: "polish-scene", sceneId: scene.id });
     } finally {
       setPolishing(false);
     }

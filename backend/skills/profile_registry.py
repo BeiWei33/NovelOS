@@ -14,6 +14,10 @@ import yaml
 
 from core.types import ExecutionProfile
 
+# Sentinel defaults — used to detect "profile was not explicitly configured"
+_DEFAULT_PROVIDER = "openai"
+_DEFAULT_MODEL = "gpt-4o"
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +46,12 @@ DEFAULT_PROFILES: dict[str, ExecutionProfile] = {
         provider="openai",
         model="gpt-4o",
         temperature=0.2,
+        max_tokens=1024,
+    ),
+    "chapter-summarizer": ExecutionProfile(
+        provider="openai",
+        model="gpt-4o",
+        temperature=0.5,
         max_tokens=1024,
     ),
 }
@@ -136,3 +146,22 @@ def init_profiles() -> None:
     )
     profile_registry.load_from_yaml(yaml_path)
     profile_registry.apply_env_overrides()
+
+    # Apply DEFAULT_PROVIDER / DEFAULT_MODEL if set
+    from core.config import settings
+
+    if settings.DEFAULT_PROVIDER or settings.DEFAULT_MODEL:
+        for role in list(profile_registry._profiles.keys()):
+            profile = profile_registry._profiles[role]
+            overrides = {}
+
+            # Replace provider if it's still the sentinel default
+            if settings.DEFAULT_PROVIDER and profile.provider == _DEFAULT_PROVIDER:
+                overrides["provider"] = settings.DEFAULT_PROVIDER
+
+            # Replace model if it's still the sentinel default
+            if settings.DEFAULT_MODEL and profile.model == _DEFAULT_MODEL:
+                overrides["model"] = settings.DEFAULT_MODEL
+
+            if overrides:
+                profile_registry._profiles[role] = replace(profile, **overrides)
