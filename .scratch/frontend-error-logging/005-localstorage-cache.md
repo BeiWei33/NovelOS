@@ -1,6 +1,6 @@
 ---
 title: 本地 localStorage 缓存（离线容错）
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

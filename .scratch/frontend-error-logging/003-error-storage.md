@@ -1,6 +1,6 @@
 ---
 title: 错误存储到后端数据库
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

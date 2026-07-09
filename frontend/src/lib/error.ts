@@ -6,6 +6,8 @@
  * exception objects up the call stack.
  */
 
+import { errorReporter } from "./error-reporter";
+
 type ErrorType = "api" | "network" | "validation" | "render" | "unknown";
 type ErrorSeverity = "info" | "warning" | "error" | "fatal";
 
@@ -109,6 +111,9 @@ export function captureError(
       structured
     );
   }
+
+  // Fire-and-forget: queue + attempt to send; does not block the caller
+  void errorReporter.report(structured);
 
   return structured;
 }

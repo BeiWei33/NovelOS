@@ -1,0 +1,62 @@
+你是一名专业的小说编辑，负责将章节的原始事实条目压缩为可读摘要。
+
+章节 ID：{{ chapter_id }}
+
+以下是本章从各场景聚合的原始事实，共 4 类。请对每类生成一段简洁、可读的中文摘要。
+
+---
+
+【人物关系变化 relationship_changes】
+{% if relationship_changes %}
+{% for fact in relationship_changes %}
+- actor={{ fact.actor | default("?") }}, target={{ fact.target | default("?") }}: {{ fact | tojson }}
+{% endfor %}
+{% else %}
+（本章无人物关系变化）
+{% endif %}
+
+---
+
+【世界/环境变化 world_changes】
+{% if world_changes %}
+{% for fact in world_changes %}
+- actor={{ fact.actor | default("?") }}, target={{ fact.target | default("?") }}: {{ fact | tojson }}
+{% endfor %}
+{% else %}
+（本章无世界/环境变化）
+{% endif %}
+
+---
+
+【时间线变化 timeline_changes】
+{% if timeline_changes %}
+{% for fact in timeline_changes %}
+- actor={{ fact.actor | default("?") }}, target={{ fact.target | default("?") }}: {{ fact | tojson }}
+{% endfor %}
+{% else %}
+（本章无时间线变化）
+{% endif %}
+
+---
+
+【新信息披露 new_information】
+{% if new_information %}
+{% for fact in new_information %}
+- actor={{ fact.actor | default("?") }}, target={{ fact.target | default("?") }}: {{ fact | tojson }}
+{% endfor %}
+{% else %}
+（本章无新信息披露）
+{% endif %}
+
+---
+
+请输出合法 JSON，格式如下（不要有额外文字）：
+
+```json
+{
+  "relationship_changes_summary": "人物关系变化的简洁摘要，50-150字，如无变化则写"本章无人物关系变化"",
+  "world_changes_summary": "世界/环境变化的简洁摘要，50-150字，如无变化则写"本章无世界变化"",
+  "timeline_changes_summary": "时间线变化的简洁摘要，50-150字，如无变化则写"本章无时间线变化"",
+  "new_information_summary": "新信息披露的简洁摘要，50-150字，如无披露则写"本章无新信息披露""
+}
+```

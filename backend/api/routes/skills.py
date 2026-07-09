@@ -22,6 +22,7 @@ from api.schemas import (
 from workflow.quality_pipeline import run_quality_pipeline, apply_patches
 from workflow.chapter_workflow import run_chapter_workflow
 from workflow.facts_aggregator import run_facts_aggregator
+from workflow.memory_updater import run_memory_updater
 
 
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -350,4 +351,31 @@ async def aggregate_facts(
             fact_type: len(items)
             for fact_type, items in facts.items()
         },
+    }
+
+
+@router.post("/update-memory/{chapter_id}")
+async def update_memory(
+    chapter_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """Compress aggregated chapter facts into readable summaries via LLM.
+
+    Reads chapter.chapter_facts (populated by aggregate-facts), calls the
+    memory-updater LLM profile to produce four summary strings, and writes
+    them back into chapter.chapter_facts.  If chapter_facts is empty the
+    LLM is skipped and an empty result is returned.
+    """
+    chapter = await db.get(Chapter, chapter_id)
+    if chapter is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
+
+    summaries = await run_memory_updater(db, chapter_id)
+
+    await db.refresh(chapter)
+
+    return {
+        "chapter_id": chapter_id,
+        "summaries": summaries,
+        "skipped": len(summaries) == 0,
     }

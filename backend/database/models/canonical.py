@@ -232,3 +232,22 @@ class ChapterArtifact(Base):
     consistency = Column(JSONB, default=dict, nullable=False)
 
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+# ─── FrontendError ────────────────────────────────────────────────────────────
+
+class FrontendError(Base):
+    """Structured error reports received from the frontend application."""
+
+    __tablename__ = "frontend_error"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    type = Column(String(50), nullable=False)
+    severity = Column(String(20), nullable=False)
+    message = Column(Text, nullable=False)
+    stack = Column(Text, nullable=True)
+    fingerprint = Column(String(64), nullable=False)
+    context = Column(JSONB, default=dict, nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)

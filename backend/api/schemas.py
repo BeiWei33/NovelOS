@@ -198,3 +198,16 @@ class ProfileInfo(BaseModel):
     model: str
     temperature: float
     max_tokens: int
+
+
+# ─── Frontend Error ──────────────────────────────────────────────────────────
+
+class FrontendErrorCreate(BaseModel):
+    """Structured error report sent from the frontend."""
+    type: str = Field(..., min_length=1, max_length=50)
+    severity: str = Field(..., min_length=1, max_length=20)
+    message: str
+    stack: Optional[str] = None
+    fingerprint: str = Field(..., min_length=1, max_length=64)
+    context: dict[str, Any] = Field(default_factory=dict)
+    user_agent: Optional[str] = None

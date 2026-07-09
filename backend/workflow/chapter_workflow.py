@@ -22,6 +22,7 @@ from skills.chapter_summarizer import build_chapter_summarizer_context
 from workflow.quality_pipeline import run_quality_pipeline, apply_patches
 from workflow.consistency_score import calculate_consistency_score, get_consistency_level
 from workflow.facts_aggregator import run_facts_aggregator
+from workflow.memory_updater import run_memory_updater
 from services.artifact_service import run_artifact_service, run_projection_builder
 
 
@@ -31,9 +32,15 @@ class WorkflowStep(str, Enum):
     QUALITY_CHECK = "quality_check"
     ARTIFACTS = "artifacts"
     FACTS = "facts"
+    MEMORY = "memory"
     SUMMARY = "summary"
     COMPLETE = "complete"
     FAILED = "failed"
+
+
+class WorkflowPausedException(Exception):
+    """Raised when workflow is paused. Does not trigger rollback."""
+    pass
 
 
 class ChapterWorkflowEngine:
@@ -45,37 +52,79 @@ class ChapterWorkflowEngine:
         self.current_step = WorkflowStep.PLAN
         self.progress: dict[str, Any] = {
             "step": "plan",
-            "total_steps": 6,
+            "total_steps": 7,
             "completed": 0,
             "scenes_written": 0,
             "errors": [],
         }
         self._rollback_data: dict[str, Any] = {}
+        self._paused: bool = False
+
+    async def pause(self) -> None:
+        """Signal the workflow to pause before the next step."""
+        self._paused = True
+
+    async def _check_paused(self) -> None:
+        """Raise WorkflowPausedException if a pause has been requested."""
+        if self._paused:
+            raise WorkflowPausedException(
+                f"Workflow paused before step '{self.current_step}'"
+            )
+
+    async def _persist_state(self) -> None:
+        """Write current progress into chapter.planning['_workflow_state']."""
+        chapter = await self.db.get(Chapter, self.chapter_id)
+        if chapter:
+            chapter.planning = chapter.planning or {}
+            chapter.planning["_workflow_state"] = dict(self.progress)
+            await self.db.commit()
 
     async def run(self, goal: str = "", theme: str = "") -> dict[str, Any]:
         """Execute the full workflow."""
         try:
             # Step 1: Plan
+            await self._check_paused()
             await self._step_plan(goal, theme)
+            await self._persist_state()
 
             # Step 2: Write scenes
+            await self._check_paused()
             await self._step_write_scenes()
+            await self._persist_state()
 
             # Step 3: Quality check
+            await self._check_paused()
             await self._step_quality_check()
+            await self._persist_state()
 
             # Step 4: Generate artifacts
+            await self._check_paused()
             await self._step_artifacts()
+            await self._persist_state()
 
             # Step 5: Aggregate facts
+            await self._check_paused()
             await self._step_facts()
+            await self._persist_state()
 
-            # Step 6: Summarize
+            # Step 6: Update memory (compress facts into summaries)
+            await self._check_paused()
+            await self._step_memory()
+            await self._persist_state()
+
+            # Step 7: Summarize
+            await self._check_paused()
             await self._step_summary()
 
             self.current_step = WorkflowStep.COMPLETE
             self.progress["step"] = "complete"
+            await self._persist_state()
             return self.progress
+
+        except WorkflowPausedException:
+            # Persist paused state without rollback, then re-raise
+            await self._persist_state()
+            raise
 
         except Exception as e:
             self.current_step = WorkflowStep.FAILED
@@ -221,8 +270,16 @@ class ChapterWorkflowEngine:
 
         self.progress["completed"] = 5
 
+    async def _step_memory(self) -> None:
+        """Step 6: Compress raw facts into readable summaries via LLM."""
+        self.progress["step"] = "memory"
+
+        await run_memory_updater(self.db, self.chapter_id)
+
+        self.progress["completed"] = 6
+
     async def _step_summary(self) -> None:
-        """Step 5: Generate chapter summary via LLM."""
+        """Step 7: Generate chapter summary via LLM."""
         self.progress["step"] = "summary"
 
         chapter = await self.db.get(Chapter, self.chapter_id)
@@ -267,7 +324,7 @@ class ChapterWorkflowEngine:
         }
 
         await self.db.commit()
-        self.progress["completed"] = 6
+        self.progress["completed"] = 7
 
     async def _rollback(self) -> None:
         """Rollback to original state."""

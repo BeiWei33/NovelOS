@@ -54,6 +54,12 @@ DEFAULT_PROFILES: dict[str, ExecutionProfile] = {
         temperature=0.5,
         max_tokens=1024,
     ),
+    "memory-updater": ExecutionProfile(
+        provider="openai",
+        model="gpt-4o",
+        temperature=0.5,
+        max_tokens=1024,
+    ),
 }
 
 

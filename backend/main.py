@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import novels, chapters, scenes, resources, skills, pipeline, samples
+from api.routes import novels, chapters, scenes, resources, skills, pipeline, samples, workflow
+from api.routes import errors as errors_router
 from core.config import settings
 from skills.providers import init_providers
 from skills.profile_registry import init_profiles
@@ -42,6 +43,8 @@ def create_app() -> FastAPI:
     app.include_router(skills.router)
     app.include_router(pipeline.router)
     app.include_router(samples.router)
+    app.include_router(workflow.router)
+    app.include_router(errors_router.router)
 
     @app.get("/health")
     async def health():

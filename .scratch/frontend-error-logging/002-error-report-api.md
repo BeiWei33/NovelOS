@@ -1,6 +1,6 @@
 ---
 title: 错误上报 API 端点
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09
