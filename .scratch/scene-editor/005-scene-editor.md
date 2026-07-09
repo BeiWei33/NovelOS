@@ -1,9 +1,10 @@
 ---
 title: Scene Editor (TipTap + Domain AST)
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-08
+completed: 2026-07-09
 ---
 
 ## What to build

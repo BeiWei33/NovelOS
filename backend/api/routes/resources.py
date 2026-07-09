@@ -64,3 +64,11 @@ async def delete_style(style_id: str, db: AsyncSession = Depends(get_session)):
     deleted = await crud.delete_style(db, style_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found")
+
+
+@router.put("/styles/{style_id}", response_model=schemas.StyleRead)
+async def update_style(style_id: str, data: schemas.StyleUpdate, db: AsyncSession = Depends(get_session)):
+    style = await crud.update_style(db, style_id, data)
+    if style is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found")
+    return style

@@ -130,6 +130,16 @@ export const api = {
     )
   },
 
+  async updateStyle(id: string, data: {
+    name?: string
+    profile?: Partial<import("../types/domain").StyleProfile>
+  }) {
+    return request<import("../types/domain").Style>(`/styles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+
   // ─── Knowledge Status ─────────────────────────────────────────────────
 
   async getSceneKnowledgeStatus(sceneId: string) {
@@ -142,5 +152,21 @@ export const api = {
       entity_count: number
       block_count: number
     }>(`/scenes/${sceneId}/knowledge-status`)
+  },
+
+  // ─── Skills ────────────────────────────────────────────────────────────
+
+  async generateChapter(chapterId: string, data: { goal?: string; theme?: string }) {
+    return request<{
+      chapter_id: string
+      title: string
+      workflow: Record<string, unknown>
+      summary: unknown
+      scene_count: number
+      planning: Record<string, unknown>
+    }>(`/skills/generate-chapter/${chapterId}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
   },
 }

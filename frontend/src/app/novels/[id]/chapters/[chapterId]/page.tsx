@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Scene } from "@/types/domain";
+import type { Scene, Style } from "@/types/domain";
 
 export default function ChapterDetail() {
   const params = useParams();
@@ -14,12 +14,19 @@ export default function ChapterDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
   const [showCreateScene, setShowCreateScene] = useState(false);
+  const [showGenerateChapter, setShowGenerateChapter] = useState(false);
+  const [generatingChapter, setGeneratingChapter] = useState(false);
+  const [generateGoal, setGenerateGoal] = useState("");
+  const [generateTheme, setGenerateTheme] = useState("");
+  const [styles, setStyles] = useState<Style[]>([]);
 
   async function loadScenes() {
     setLoading(true);
     try {
       const list = await api.listScenes(chapterId);
       setScenes(list);
+      const stylesList = await api.listStyles(novelId);
+      setStyles(stylesList);
     } catch (e) {
       console.error(e);
     } finally {
@@ -45,6 +52,25 @@ export default function ChapterDetail() {
     }
   }
 
+  async function handleGenerateChapter() {
+    setGeneratingChapter(true);
+    try {
+      await api.generateChapter(chapterId, {
+        goal: generateGoal,
+        theme: generateTheme,
+      });
+      setShowGenerateChapter(false);
+      setGenerateGoal("");
+      setGenerateTheme("");
+      await loadScenes();
+    } catch (e) {
+      console.error(e);
+      alert("整章生成失败，请查看控制台日志");
+    } finally {
+      setGeneratingChapter(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       {/* Left: Scene list */}
@@ -56,6 +82,15 @@ export default function ChapterDetail() {
           >
             ← 返回
           </a>
+        </div>
+        <div className="p-3 border-b border-gray-800">
+          <button
+            onClick={() => setShowGenerateChapter(true)}
+            disabled={generatingChapter}
+            className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
+          >
+            {generatingChapter ? "生成中..." : "一键生成整章"}
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {loading ? (
@@ -125,6 +160,63 @@ export default function ChapterDetail() {
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
               >
                 创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGenerateChapter && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">一键生成整章</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              将运行完整工作流：规划场景 → AI 写作 → 质量检查 → 生成摘要
+            </p>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  目标（可选）
+                </label>
+                <input
+                  type="text"
+                  value={generateGoal}
+                  onChange={(e) => setGenerateGoal(e.target.value)}
+                  placeholder="本章要达成的叙事目标..."
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-violet-500 placeholder-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  主题（可选）
+                </label>
+                <input
+                  type="text"
+                  value={generateTheme}
+                  onChange={(e) => setGenerateTheme(e.target.value)}
+                  placeholder="本章的核心主题..."
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-violet-500 placeholder-gray-600"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowGenerateChapter(false);
+                  setGenerateGoal("");
+                  setGenerateTheme("");
+                }}
+                disabled={generatingChapter}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-300 disabled:opacity-40"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleGenerateChapter}
+                disabled={generatingChapter}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium"
+              >
+                {generatingChapter ? "生成中，请稍候..." : "开始生成"}
               </button>
             </div>
           </div>
@@ -283,6 +375,12 @@ function SceneEditor({
         <span className="text-sm text-gray-400">
           v{scene.version}
         </span>
+        {/* Current style badge */}
+        {styles.length > 0 && (
+          <span className="text-xs px-2 py-0.5 bg-gray-800 rounded text-gray-400">
+            风格: {styles[0].name}
+          </span>
+        )}
         {/* Knowledge status badge */}
         {knowledgeStatus && (
           <span className={`text-xs px-2 py-0.5 rounded-full ${

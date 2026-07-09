@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { Chapter, Character, World, Style } from "@/types/domain";
+import type { Chapter, Character, World, Style, StyleProfile } from "@/types/domain";
 
 type Tab = "chapters" | "characters" | "worlds" | "styles";
 
@@ -34,6 +34,10 @@ export default function NovelDetail() {
   // Style create
   const [showCreateStyle, setShowCreateStyle] = useState(false);
   const [styleName, setStyleName] = useState("");
+
+  // Style edit
+  const [editingStyle, setEditingStyle] = useState<Style | null>(null);
+  const [editProfile, setEditProfile] = useState<StyleProfile>({});
 
   async function loadAll() {
     setLoading(true);
@@ -161,6 +165,22 @@ export default function NovelDetail() {
       if (!res.ok) throw new Error(await res.text());
       setStyleName("");
       setShowCreateStyle(false);
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function openStyleEdit(s: Style) {
+    setEditingStyle(s);
+    setEditProfile(s.profile || {});
+  }
+
+  async function handleSaveStyle() {
+    if (!editingStyle) return;
+    try {
+      await api.updateStyle(editingStyle.id, { profile: editProfile });
+      setEditingStyle(null);
       await loadAll();
     } catch (e) {
       console.error(e);
@@ -396,13 +416,21 @@ export default function NovelDetail() {
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteStyle(s.id)}
-                      className="text-red-400 hover:text-red-300 text-xs opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      删除
-                    </button>
-                  </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openStyleEdit(s)}
+                          className="text-indigo-400 hover:text-indigo-300 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          编辑
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStyle(s.id)}
+                          className="text-red-400 hover:text-red-300 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
                 ))}
               </div>
             )}
@@ -528,6 +556,140 @@ export default function NovelDetail() {
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg text-sm font-medium"
               >
                 创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Style Edit Modal */}
+      {editingStyle && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">编辑风格: {editingStyle.name}</h3>
+
+            <div className="space-y-5">
+              {/* dialog_ratio: slider 0-1, step 0.05 */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  对话比例: {Math.round((editProfile.dialog_ratio ?? 0) * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={editProfile.dialog_ratio ?? 0}
+                  onChange={(e) => setEditProfile({ ...editProfile, dialog_ratio: parseFloat(e.target.value) })}
+                  className="w-full accent-indigo-500"
+                />
+                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                  <span>0%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              {/* emotion */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">情感表达</label>
+                <select
+                  value={editProfile.emotion ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, emotion: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="implicit">implicit</option>
+                  <option value="explicit">explicit</option>
+                </select>
+              </div>
+
+              {/* sentence */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">句式</label>
+                <select
+                  value={editProfile.sentence ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, sentence: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="short">short</option>
+                  <option value="long">long</option>
+                  <option value="mixed">mixed</option>
+                </select>
+              </div>
+
+              {/* description */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">描写方式</label>
+                <select
+                  value={editProfile.description ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, description: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="concrete">concrete</option>
+                  <option value="abstract">abstract</option>
+                </select>
+              </div>
+
+              {/* psychology */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">心理描写</label>
+                <select
+                  value={editProfile.psychology ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, psychology: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="low">low</option>
+                  <option value="high">high</option>
+                </select>
+              </div>
+
+              {/* humor */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">幽默风格</label>
+                <select
+                  value={editProfile.humor ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, humor: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="dry">dry</option>
+                  <option value="warm">warm</option>
+                  <option value="dark">dark</option>
+                  <option value="none">none</option>
+                </select>
+              </div>
+
+              {/* pace */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">节奏</label>
+                <select
+                  value={editProfile.pace ?? ""}
+                  onChange={(e) => setEditProfile({ ...editProfile, pace: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">未设置</option>
+                  <option value="fast">fast</option>
+                  <option value="slow">slow</option>
+                  <option value="varied">varied</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setEditingStyle(null)}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-300"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveStyle}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
+              >
+                保存
               </button>
             </div>
           </div>

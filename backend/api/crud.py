@@ -226,3 +226,24 @@ async def delete_style(db: AsyncSession, style_id: str) -> bool:
     await db.delete(style)
     await db.commit()
     return True
+
+
+async def update_style(
+    db: AsyncSession,
+    style_id: str,
+    data: schemas.StyleUpdate,
+) -> Optional[Style]:
+    style = await db.execute(select(Style).where(Style.id == style_id))
+    style = style.scalar_one_or_none()
+    if style is None:
+        return None
+
+    if data.name is not None:
+        style.name = data.name
+    if data.profile is not None:
+        style.profile = data.profile
+    style.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(style)
+    return style
