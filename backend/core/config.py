@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: Optional[str] = None
 
+    # GLM-5.2 (GLM-5.2 compatible API)
+    GLM_API_KEY: Optional[str] = None
+    GLM_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
+
     # Embedding model
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSIONS: int = 1536

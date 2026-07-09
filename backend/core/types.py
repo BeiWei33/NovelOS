@@ -47,6 +47,21 @@ class KnowledgeObject:
     confidence: float = 1.0
 
 
+# ─── Provider Config ──────────────────────────────────────────────────────────
+
+@dataclass
+class ProviderConfig:
+    """Configuration for a single LLM provider.
+
+    Instead of reading global settings directly, each adapter receives a
+    ProviderConfig with the fields it needs.
+    """
+    api_key: str = ""
+    base_url: str = ""
+    default_model: str = "gpt-4o"
+    default_max_tokens: int = 2048
+
+
 # ─── Execution Profile ────────────────────────────────────────────────────────
 
 @dataclass

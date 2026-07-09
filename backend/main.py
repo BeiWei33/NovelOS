@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import novels, chapters, scenes, resources, skills, pipeline, samples
 from core.config import settings
+from skills.providers import init_providers
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup — initialize LLM providers
+    init_providers()
     yield
     # Shutdown
 
