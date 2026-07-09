@@ -6,6 +6,7 @@ YAML configuration files, and environment variables.
 """
 
 from __future__ import annotations
+import logging
 import os
 import re
 from abc import ABC, abstractmethod
@@ -15,6 +16,9 @@ import yaml
 from openai import AsyncOpenAI
 
 from core.types import ExecutionProfile, ProviderConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderAdapter(ABC):
@@ -74,6 +78,118 @@ class OpenAIAdapter(ProviderAdapter):
         return response.choices[0].message.content or ""
 
 
+class AnthropicAdapter(ProviderAdapter):
+    """Anthropic Claude API adapter.
+
+    Handles Anthropic-specific message format (separate system parameter,
+    content blocks for multimodal).
+    """
+
+    def __init__(self, config: ProviderConfig):
+        super().__init__(config)
+        self._client = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                from anthropic import AsyncAnthropic
+            except ImportError:
+                raise ImportError(
+                    "anthropic package not installed. "
+                    "Add 'anthropic' to requirements.txt"
+                )
+            if not self._config.api_key:
+                raise ValueError(
+                    "ANTHROPIC_API_KEY not configured. "
+                    "Set the ANTHROPIC_API_KEY environment variable."
+                )
+            self._client = AsyncAnthropic(api_key=self._config.api_key)
+        return self._client
+
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        profile: ExecutionProfile,
+    ) -> str:
+        client = self._get_client()
+        model = profile.model or self._config.default_model
+        max_tokens = profile.max_tokens or self._config.default_max_tokens
+
+        # Extract system message from messages
+        system = ""
+        chat_messages = []
+        for msg in messages:
+            if msg.get("role") == "system":
+                system = msg.get("content", "")
+            else:
+                chat_messages.append({
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", ""),
+                })
+
+        # Anthropic requires at least one message
+        if not chat_messages:
+            chat_messages = [{"role": "user", "content": ""}]
+
+        response = await client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system if system else None,
+            messages=chat_messages,
+        )
+        # Extract text from content blocks
+        text_parts = []
+        for block in response.content:
+            if hasattr(block, "text"):
+                text_parts.append(block.text)
+        return "".join(text_parts)
+
+
+class OllamaNativeAdapter(ProviderAdapter):
+    """Ollama native API adapter.
+
+    Uses Ollama's /api/chat endpoint for local model inference.
+    No API key required.
+    """
+
+    def __init__(self, config: ProviderConfig):
+        super().__init__(config)
+        self._base_url = config.base_url or "http://localhost:11434"
+
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        profile: ExecutionProfile,
+    ) -> str:
+        import httpx
+
+        model = profile.model or self._config.default_model
+        max_tokens = profile.max_tokens or self._config.default_max_tokens
+
+        # Ollama /api/chat format
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": profile.temperature,
+            },
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self._base_url}/api/chat",
+                json=payload,
+                timeout=120.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # Extract response text
+        return data.get("message", {}).get("content", "")
+
+
 class ProviderRouter:
     """Routes skill execution to the right provider based on profile."""
 
@@ -112,6 +228,71 @@ class ProviderRouter:
                 f"Available providers: {available}"
             )
         return await adapter.chat(messages, profile)
+
+    async def execute_with_fallback(
+        self,
+        messages: list[dict[str, str]],
+        profile: ExecutionProfile,
+        fallback_chain: list[str] | None = None,
+    ) -> tuple[str, str]:
+        """Execute with automatic fallback on failure.
+
+        Returns tuple of (response, actual_provider_used).
+
+        Only retries on retryable errors (timeout, rate limit, 5xx).
+        Authentication and validation errors are raised immediately.
+        """
+        if fallback_chain is None:
+            fallback_chain = [profile.provider]
+
+        last_error = None
+        for provider_name in fallback_chain:
+            adapter = self._adapters.get(provider_name)
+            if adapter is None:
+                logger.warning(f"Provider '{provider_name}' not registered, skipping")
+                continue
+
+            try:
+                # Create a modified profile with this provider
+                from dataclasses import replace
+                attempt_profile = replace(profile, provider=provider_name)
+                response = await adapter.chat(messages, attempt_profile)
+                if provider_name != profile.provider:
+                    logger.info(
+                        f"Fallback: used {provider_name} instead of {profile.provider}"
+                    )
+                return response, provider_name
+            except Exception as e:
+                error_str = str(e).lower()
+                # Check if error is retryable
+                is_retryable = any(
+                    keyword in error_str
+                    for keyword in [
+                        "timeout", "rate limit", "429", "503", "502", "504",
+                        "connection", "unavailable", "overloaded",
+                    ]
+                )
+                # Authentication errors are not retryable
+                is_auth_error = any(
+                    keyword in error_str
+                    for keyword in ["401", "authentication", "invalid api key", "unauthorized"]
+                )
+
+                if is_auth_error:
+                    raise  # Re-raise authentication errors immediately
+
+                if not is_retryable:
+                    raise  # Re-raise non-retryable errors
+
+                last_error = e
+                logger.warning(
+                    f"Provider {provider_name} failed: {e}. Trying next provider..."
+                )
+
+        # All providers failed
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"No providers available in chain: {fallback_chain}")
 
 
 # Global router instance
@@ -227,3 +408,22 @@ def init_providers() -> None:
     for name, config in env_providers.items():
         if name not in router.list_providers():
             router.register(name, OpenAIAdapter, config)
+
+    # 4. Register Anthropic provider
+    if settings.ANTHROPIC_API_KEY:
+        anthropic_config = ProviderConfig(
+            api_key=settings.ANTHROPIC_API_KEY,
+            default_model="claude-sonnet-4-20250514",
+            default_max_tokens=4096,
+        )
+        router.register("anthropic", AnthropicAdapter, anthropic_config)
+
+    # 5. Register Ollama native provider
+    if settings.OLLAMA_HOST:
+        ollama_config = ProviderConfig(
+            api_key="",  # Ollama doesn't need API key
+            base_url=settings.OLLAMA_HOST,
+            default_model="llama3",
+            default_max_tokens=2048,
+        )
+        router.register("ollama-native", OllamaNativeAdapter, ollama_config)

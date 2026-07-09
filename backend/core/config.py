@@ -19,9 +19,15 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: Optional[str] = None
 
-    # GLM-5.2 (GLM-5.2 compatible API)
+    # GLM (智谱 AI)
     GLM_API_KEY: Optional[str] = None
     GLM_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
+
+    # Anthropic Claude
+    ANTHROPIC_API_KEY: Optional[str] = None
+
+    # Ollama (local)
+    OLLAMA_HOST: str = "http://localhost:11434"
 
     # Embedding model
     EMBEDDING_MODEL: str = "text-embedding-3-small"

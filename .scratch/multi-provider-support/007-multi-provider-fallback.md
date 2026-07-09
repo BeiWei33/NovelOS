@@ -1,9 +1,10 @@
 ---
 title: 多 Provider Fallback 机制
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09
+completed: 2026-07-09
 ---
 
 ## What to build
