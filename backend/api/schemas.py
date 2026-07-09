@@ -122,6 +122,17 @@ class CharacterRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CharacterUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    age: Optional[int] = None
+    occupation: Optional[str] = None
+    personality: Optional[list[str]] = None
+    goal: Optional[str] = None
+    fear: Optional[str] = None
+    habit: Optional[list[str]] = None
+    speech_style: Optional[str] = None
+
+
 # ─── World ────────────────────────────────────────────────────────────────────
 
 class WorldCreate(BaseModel):
@@ -139,6 +150,11 @@ class WorldRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WorldUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    config: Optional[dict[str, Any]] = None
 
 
 # ─── Style ────────────────────────────────────────────────────────────────────

@@ -114,12 +114,26 @@ export const api = {
     })
   },
 
+  async updateCharacter(id: string, data: Partial<import("../types/domain").Character>) {
+    return request<import("../types/domain").Character>(`/characters/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+
   // ─── Worlds ──────────────────────────────────────────────────────────────
 
   async listWorlds(novelId: string) {
     return request<import("../types/domain").World[]>(
       `/worlds?novel_id=${novelId}`
     )
+  },
+
+  async updateWorld(id: string, data: { name?: string; config?: Record<string, unknown> }) {
+    return request<import("../types/domain").World>(`/worlds/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
   },
 
   // ─── Styles ──────────────────────────────────────────────────────────────

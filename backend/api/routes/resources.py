@@ -28,6 +28,14 @@ async def delete_character(character_id: str, db: AsyncSession = Depends(get_ses
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
 
 
+@router.put("/characters/{character_id}", response_model=schemas.CharacterRead)
+async def update_character(character_id: str, data: schemas.CharacterUpdate, db: AsyncSession = Depends(get_session)):
+    char = await crud.update_character(db, character_id, data)
+    if char is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
+    return char
+
+
 # ─── Worlds ───────────────────────────────────────────────────────────────────
 
 @router.post("/worlds", response_model=schemas.WorldRead, status_code=status.HTTP_201_CREATED)
@@ -45,6 +53,14 @@ async def delete_world(world_id: str, db: AsyncSession = Depends(get_session)):
     deleted = await crud.delete_world(db, world_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="World not found")
+
+
+@router.put("/worlds/{world_id}", response_model=schemas.WorldRead)
+async def update_world(world_id: str, data: schemas.WorldUpdate, db: AsyncSession = Depends(get_session)):
+    world = await crud.update_world(db, world_id, data)
+    if world is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="World not found")
+    return world
 
 
 # ─── Styles ───────────────────────────────────────────────────────────────────

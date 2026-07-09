@@ -174,6 +174,39 @@ async def delete_character(db: AsyncSession, character_id: str) -> bool:
     return True
 
 
+async def update_character(
+    db: AsyncSession,
+    character_id: str,
+    data: schemas.CharacterUpdate,
+) -> Optional[Character]:
+    char = await db.execute(select(Character).where(Character.id == character_id))
+    char = char.scalar_one_or_none()
+    if char is None:
+        return None
+
+    if data.name is not None:
+        char.name = data.name
+    if data.age is not None:
+        char.age = data.age
+    if data.occupation is not None:
+        char.occupation = data.occupation
+    if data.personality is not None:
+        char.personality = data.personality
+    if data.goal is not None:
+        char.goal = data.goal
+    if data.fear is not None:
+        char.fear = data.fear
+    if data.habit is not None:
+        char.habit = data.habit
+    if data.speech_style is not None:
+        char.speech_style = data.speech_style
+    char.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(char)
+    return char
+
+
 # ─── World ────────────────────────────────────────────────────────────────────
 
 async def create_world(db: AsyncSession, data: schemas.WorldCreate) -> World:
@@ -199,6 +232,27 @@ async def delete_world(db: AsyncSession, world_id: str) -> bool:
     await db.delete(world)
     await db.commit()
     return True
+
+
+async def update_world(
+    db: AsyncSession,
+    world_id: str,
+    data: schemas.WorldUpdate,
+) -> Optional[World]:
+    world = await db.execute(select(World).where(World.id == world_id))
+    world = world.scalar_one_or_none()
+    if world is None:
+        return None
+
+    if data.name is not None:
+        world.name = data.name
+    if data.config is not None:
+        world.config = data.config
+    world.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(world)
+    return world
 
 
 # ─── Style ────────────────────────────────────────────────────────────────────
