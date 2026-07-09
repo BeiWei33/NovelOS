@@ -1,6 +1,6 @@
 ---
 title: 修复历史查看 UI
-status: open
+status: done
 labels:
   - ready-for-human
 created: 2026-07-09

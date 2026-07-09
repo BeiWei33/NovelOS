@@ -1,6 +1,6 @@
 ---
 title: 错误分析与修复决策器
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

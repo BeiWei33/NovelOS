@@ -60,6 +60,18 @@ DEFAULT_PROFILES: dict[str, ExecutionProfile] = {
         temperature=0.5,
         max_tokens=1024,
     ),
+    "error-analyzer": ExecutionProfile(
+        provider="openai",
+        model="gpt-4o",
+        temperature=0.3,
+        max_tokens=1024,
+    ),
+    "patch-generator": ExecutionProfile(
+        provider="openai",
+        model="gpt-4o",
+        temperature=0.3,
+        max_tokens=2048,
+    ),
 }
 
 

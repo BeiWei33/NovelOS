@@ -1,6 +1,6 @@
 ---
 title: 修复结果验证
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

@@ -1,6 +1,6 @@
 ---
 title: 代码 Patch 生成器
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09
