@@ -1,3 +1,1 @@
--- pgvector extension will be installed via apt in a custom Dockerfile
--- If using the pgvector/pgvector image, this creates the extension:
--- CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS vector;

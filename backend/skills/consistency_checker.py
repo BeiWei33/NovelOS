@@ -16,6 +16,7 @@ from sqlalchemy import select
 from core.types import SkillManifest, ExecutionProfile
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
 from database.models.canonical import Character, World
 
@@ -64,7 +65,7 @@ class ConsistencyCheckerSkill(Skill):
         response = await router.execute(messages, CONSISTENCY_CHECKER_PROFILE)
         elapsed_ms = int((time.time() - start) * 1000)
 
-        issues = self._parse_issues(response)
+        issues = parse_list_from_response(response, "issues")
 
         return {
             "issues": issues,
@@ -77,26 +78,6 @@ class ConsistencyCheckerSkill(Skill):
                 "duration_ms": elapsed_ms,
             },
         }
-
-    def _parse_issues(self, response: str) -> list[dict]:
-        """Parse issues from LLM response."""
-        if "```json" in response:
-            json_str = response.split("```json")[1].split("```")[0].strip()
-        elif "```" in response:
-            json_str = response.split("```")[1].split("```")[0].strip()
-        else:
-            json_str = response.strip()
-
-        try:
-            data = json.loads(json_str)
-            if isinstance(data, dict) and "issues" in data:
-                return data["issues"]
-            if isinstance(data, list):
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        return []
 
 
 # Register

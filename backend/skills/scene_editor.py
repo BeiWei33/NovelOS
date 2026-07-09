@@ -13,6 +13,7 @@ from typing import Any
 from core.types import SkillManifest, ExecutionProfile
 from skills.base import Skill, registry
 from skills.providers import router
+from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
 
 
@@ -107,7 +108,7 @@ class SceneEditorSkill(Skill):
         response = await router.execute(messages, SCENE_EDITOR_PROFILE)
         elapsed_ms = int((time.time() - start) * 1000)
 
-        patches = self._parse_patches(response)
+        patches = parse_list_from_response(response, "patches")
 
         return {
             "patches": patches,
@@ -121,26 +122,6 @@ class SceneEditorSkill(Skill):
                 "rules_applied": [r["id"] for r in DESLOP_RULES],
             },
         }
-
-    def _parse_patches(self, response: str) -> list[dict]:
-        """Parse patches from LLM response."""
-        if "```json" in response:
-            json_str = response.split("```json")[1].split("```")[0].strip()
-        elif "```" in response:
-            json_str = response.split("```")[1].split("```")[0].strip()
-        else:
-            json_str = response.strip()
-
-        try:
-            data = json.loads(json_str)
-            if isinstance(data, dict) and "patches" in data:
-                return data["patches"]
-            if isinstance(data, list):
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        return []
 
 
 # Register

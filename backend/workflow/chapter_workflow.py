@@ -18,7 +18,7 @@ from database.models.canonical import Scene, Chapter
 from skills.base import registry
 from skills.story_planner import build_story_planner_context
 from skills.scene_writer import build_scene_writer_context
-from workflow.quality_pipeline import run_quality_pipeline
+from workflow.quality_pipeline import run_quality_pipeline, apply_patches
 from services.artifact_service import run_artifact_service, run_projection_builder
 
 
@@ -166,19 +166,9 @@ class ChapterWorkflowEngine:
 
         for scene in scenes:
             result = await run_quality_pipeline(self.db, scene)
-            # Apply patches if any
             patches = result.get("patches", [])
             if patches:
-                # Simple apply
-                for patch in patches:
-                    if patch.get("op") == "replace" and "block_index" in patch:
-                        blocks = scene.document.get("blocks", [])
-                        idx = patch["block_index"]
-                        if idx < len(blocks):
-                            old = patch.get("old_text", "")
-                            new = patch.get("new_text", "")
-                            if old in blocks[idx].get("content", ""):
-                                blocks[idx]["content"] = blocks[idx]["content"].replace(old, new, 1)
+                scene.document = apply_patches(scene.document or {"blocks": []}, patches)
                 scene.version += 1
 
             scene.body_history = scene.body_history or {}

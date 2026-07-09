@@ -20,8 +20,7 @@ from prompts.builder import render_template
 from database.models.canonical import (
     Scene, Character, World, Style, Novel,
 )
-from api.crud import update_scene
-from api.schemas import SceneUpdate, SceneDocument, SceneBlock
+from skills.parsing import parse_json_from_markdown
 
 
 SCENE_WRITER_MANIFEST = SkillManifest(
@@ -217,7 +216,12 @@ async def build_scene_writer_context(
             history_parts.append(f"场景 {ps.order}: {summary}...")
     context["scene_history"] = "\n".join(history_parts) if history_parts else "这是第一个场景"
 
-    # Rewrite samples (empty for now — will be populated in Phase 4)
-    context["rewrite_samples"] = []
+    # Rewrite samples - fetch similar samples for context
+    from services.rewrite_sample_service import list_rewrite_samples
+    samples = await list_rewrite_samples(db, novel_id)
+    context["rewrite_samples"] = [
+        {"input": s.input_text, "output": s.output_text, "tags": s.tags}
+        for s in samples[:3]
+    ]
 
     return context
