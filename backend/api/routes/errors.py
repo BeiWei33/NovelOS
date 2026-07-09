@@ -1,18 +1,22 @@
 """
-Frontend Error Report API — receives structured error reports from the frontend.
+Frontend Error Report API — receives structured error reports from the frontend
+and provides a listing endpoint with pagination, filtering, and aggregation.
 
 Features:
 - Sensitive field filtering (password, token, api_key, secret)
 - In-memory rate limiting: same fingerprint max 10 times per minute
 - Best-effort DB persistence (logs on failure, never raises to caller)
+- GET /errors with pagination, type/severity/since filtering, fingerprint aggregation
 """
 
 from __future__ import annotations
 import logging
 import time
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import FrontendErrorCreate
@@ -144,3 +148,134 @@ async def report_error(
         await db.rollback()
 
     return {"received": True, "id": error_id}
+
+
+# ─── GET Endpoint: List errors ─────────────────────────────────────────────────
+
+@router.get("")
+async def list_errors(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
+    type: str | None = Query(None, description="Filter by error type"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    since: str | None = Query(None, description="Filter errors since ISO datetime"),
+    aggregate: bool = Query(False, description="Group by fingerprint and count"),
+    db: AsyncSession = Depends(get_session),
+):
+    """List frontend errors with pagination and filtering.
+
+    When aggregate=true, returns errors grouped by fingerprint with counts:
+        { aggregations: [{fingerprint, count, type, severity, message}], ... }
+
+    Otherwise returns a paginated list:
+        { errors: [...], total: int, page: int, limit: int }
+    """
+    # Build base query with filters
+    base_query = select(FrontendError)
+
+    if type:
+        base_query = base_query.where(FrontendError.type == type)
+    if severity:
+        base_query = base_query.where(FrontendError.severity == severity)
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            base_query = base_query.where(FrontendError.created_at >= since_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore filter
+
+    if aggregate:
+        # Group by fingerprint and count
+        agg_query = (
+            select(
+                FrontendError.fingerprint,
+                func.count(FrontendError.id).label("count"),
+                FrontendError.type,
+                FrontendError.severity,
+                FrontendError.message,
+            )
+            .group_by(
+                FrontendError.fingerprint,
+                FrontendError.type,
+                FrontendError.severity,
+                FrontendError.message,
+            )
+            .order_by(func.count(FrontendError.id).desc())
+        )
+
+        # Apply same filters to aggregation query
+        if type:
+            agg_query = agg_query.where(FrontendError.type == type)
+        if severity:
+            agg_query = agg_query.where(FrontendError.severity == severity)
+        if since:
+            try:
+                since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                agg_query = agg_query.where(FrontendError.created_at >= since_dt)
+            except ValueError:
+                pass
+
+        result = await db.execute(agg_query)
+        rows = result.all()
+
+        aggregations = [
+            {
+                "fingerprint": row.fingerprint,
+                "count": row.count,
+                "type": row.type,
+                "severity": row.severity,
+                "message": row.message,
+            }
+            for row in rows
+        ]
+
+        return {"aggregations": aggregations}
+
+    # Count total matching records
+    count_query = select(func.count(FrontendError.id))
+    if type:
+        count_query = count_query.where(FrontendError.type == type)
+    if severity:
+        count_query = count_query.where(FrontendError.severity == severity)
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            count_query = count_query.where(FrontendError.created_at >= since_dt)
+        except ValueError:
+            pass
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Paginated query (most recent first)
+    offset = (page - 1) * limit
+    paginated_query = (
+        base_query
+        .order_by(FrontendError.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    result = await db.execute(paginated_query)
+    errors = result.scalars().all()
+
+    return {
+        "errors": [
+            {
+                "id": str(e.id),
+                "type": e.type,
+                "severity": e.severity,
+                "message": e.message,
+                "stack": e.stack,
+                "fingerprint": e.fingerprint,
+                "context": e.context,
+                "ip_address": e.ip_address,
+                "user_agent": e.user_agent,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in errors
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+    }

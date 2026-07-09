@@ -19,7 +19,10 @@ from skills.providers import router
 from skills.profile_registry import profile_registry
 from skills.parsing import parse_list_from_response
 from prompts.builder import render_template
-from database.models.canonical import Scene, Character, World, Style, Chapter
+from database.models.canonical import (
+    Scene, Character, World, Style, Chapter, NarrativeEvent,
+)
+from knowledge.retrievers import KnowledgeEngine
 
 
 STORY_PLANNER_MANIFEST = SkillManifest(
@@ -81,7 +84,11 @@ async def build_story_planner_context(
     goal: str = "",
     theme: str = "",
 ) -> dict[str, Any]:
-    """Assemble context for StoryPlanner."""
+    """Assemble context for StoryPlanner.
+
+    Returns a standardized context dict with:
+      goal, theme, chapter_summary, characters, world_state, recent_events
+    """
     context: dict[str, Any] = {
         "goal": goal,
         "theme": theme,
@@ -94,39 +101,89 @@ async def build_story_planner_context(
 
     novel_id = chapter.novel_id
 
-    # Characters
+    # Chapter summary from planning / summary fields
+    planning = chapter.planning or {}
+    summary = chapter.summary or {}
+    context["chapter_summary"] = (
+        summary.get("one_paragraph", "")
+        or summary.get("one_line", "")
+        or planning.get("goal", "")
+        or ""
+    )
+
+    # ── Characters: canonical data + Knowledge Layer projections ──
     chars_result = await db.execute(
         select(Character).where(Character.novel_id == novel_id)
     )
     characters = chars_result.scalars().all()
+
+    # Fetch character_state from Knowledge Layer
+    engine = KnowledgeEngine(db)
+    char_knowledge = await engine.retrieve(
+        knowledge_types=["character_state"],
+        novel_id=novel_id,
+    )
+    # Build lookup: character_id -> {state, arc_summary}
+    char_state_map: dict[str, dict[str, Any]] = {}
+    for obj in char_knowledge.get("character_state", []):
+        cid = obj.payload.get("character", "")
+        char_state_map[cid] = {
+            "state": obj.payload.get("state", {}),
+            "arc_summary": obj.payload.get("arc", ""),
+        }
+
     context["characters"] = [
         {
             "name": c.name,
-            "goal": c.goal,
-            "fear": c.fear,
+            "state": char_state_map.get(c.name, {}).get("state", {}),
+            "arc_summary": char_state_map.get(c.name, {}).get("arc_summary", ""),
         }
         for c in characters
     ]
 
-    # World
+    # ── World state: canonical data as structured key facts ──
     worlds_result = await db.execute(
         select(World).where(World.novel_id == novel_id)
     )
     worlds = worlds_result.scalars().all()
-    world_parts = []
+    world_facts: list[dict[str, Any]] = []
     for w in worlds:
-        world_parts.append(f"{w.name}: {json.dumps(w.config, ensure_ascii=False)}")
-    context["world_state"] = "\n".join(world_parts) if world_parts else "现代都市"
+        config = w.config or {}
+        for key, val in config.items():
+            world_facts.append({"world": w.name, "key": key, "value": val})
+    context["world_state"] = world_facts if world_facts else [{"key": "default", "value": "现代都市"}]
 
-    # Existing scenes in chapter
+    # ── Recent events: NarrativeEvent from scenes in this chapter ──
     scenes_result = await db.execute(
         select(Scene).where(Scene.chapter_id == chapter_id).order_by(Scene.order)
     )
-    existing_scenes = scenes_result.scalars().all()
-    context["existing_scene_count"] = len(existing_scenes)
+    chapter_scenes = scenes_result.scalars().all()
+    scene_ids = [s.id for s in chapter_scenes]
+
+    recent_events: list[dict[str, Any]] = []
+    if scene_ids:
+        events_result = await db.execute(
+            select(NarrativeEvent)
+            .where(NarrativeEvent.scene_id.in_(scene_ids))
+            .order_by(NarrativeEvent.sequence)
+            .limit(20)
+        )
+        events = events_result.scalars().all()
+        recent_events = [
+            {
+                "type": e.type,
+                "actor": e.actor,
+                "summary": (e.payload or {}).get("content_preview", ""),
+            }
+            for e in events
+        ]
+    context["recent_events"] = recent_events
+
+    # ── Existing scenes in chapter (for template) ──
+    context["existing_scene_count"] = len(chapter_scenes)
     context["existing_scenes"] = [
-        {"order": s.order, "goal": s.planning.get("goal", "")}
-        for s in existing_scenes
+        {"order": s.order, "goal": (s.planning or {}).get("goal", "")}
+        for s in chapter_scenes
         if s.planning
     ]
 

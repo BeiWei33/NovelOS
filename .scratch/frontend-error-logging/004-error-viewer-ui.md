@@ -1,6 +1,6 @@
 ---
 title: 错误查看 UI（Dashboard）
-status: open
+status: done
 labels:
   - ready-for-human
 created: 2026-07-09
