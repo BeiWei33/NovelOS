@@ -5,8 +5,13 @@ Runs validation checks on patched code:
 - TypeScript type checking (tsc --noEmit)
 - ESLint checking (npm run lint)
 - Unit tests (npm run test)
+- Frontend build (npm run build)
 
 Automatically triggers rollback if verification fails.
+
+Configurable:
+- Skip specific verification steps
+- Custom timeout for each step
 """
 
 from __future__ import annotations
@@ -25,27 +30,62 @@ from workflow.git_operations import rollback_patch
 
 logger = logging.getLogger(__name__)
 
-# Verification timeout in seconds
-VERIFICATION_TIMEOUT = 300  # 5 minutes
+# Default verification timeout in seconds
+DEFAULT_VERIFICATION_TIMEOUT = 300  # 5 minutes
+
+# Default timeouts for individual commands
+DEFAULT_TSC_TIMEOUT = 120
+DEFAULT_ESLINT_TIMEOUT = 120
+DEFAULT_TEST_TIMEOUT = 180
+DEFAULT_BUILD_TIMEOUT = 180
 
 # Commands to run for verification
 TSC_COMMAND = ["npx", "tsc", "--noEmit"]
 ESLINT_COMMAND = ["npm", "run", "lint"]
 TEST_COMMAND = ["npm", "run", "test"]
+BUILD_COMMAND = ["npm", "run", "build"]
+
+
+class VerificationConfig:
+    """Configuration for verification steps."""
+
+    def __init__(
+        self,
+        skip_tsc: bool = False,
+        skip_eslint: bool = False,
+        skip_test: bool = False,
+        skip_build: bool = True,  # Build is skipped by default
+        tsc_timeout: int = DEFAULT_TSC_TIMEOUT,
+        eslint_timeout: int = DEFAULT_ESLINT_TIMEOUT,
+        test_timeout: int = DEFAULT_TEST_TIMEOUT,
+        build_timeout: int = DEFAULT_BUILD_TIMEOUT,
+        overall_timeout: int = DEFAULT_VERIFICATION_TIMEOUT,
+    ):
+        self.skip_tsc = skip_tsc
+        self.skip_eslint = skip_eslint
+        self.skip_test = skip_test
+        self.skip_build = skip_build
+        self.tsc_timeout = tsc_timeout
+        self.eslint_timeout = eslint_timeout
+        self.test_timeout = test_timeout
+        self.build_timeout = build_timeout
+        self.overall_timeout = overall_timeout
 
 
 async def verify_patch(
     patch_id: str,
     db: AsyncSession,
     frontend_dir: str | None = None,
+    config: VerificationConfig | None = None,
 ) -> dict[str, Any]:
     """
     Run verification checks on a patch.
 
     Runs:
-    1. TypeScript type checking
-    2. ESLint checking
-    3. Unit tests
+    1. TypeScript type checking (configurable)
+    2. ESLint checking (configurable)
+    3. Unit tests (configurable)
+    4. Frontend build (configurable, skipped by default)
 
     If any check fails, triggers automatic rollback.
 
@@ -53,21 +93,27 @@ async def verify_patch(
         patch_id: UUID of the patch to verify
         db: Database session
         frontend_dir: Path to frontend directory (auto-detected if not provided)
+        config: VerificationConfig to customize which steps to run and timeouts
 
     Returns:
         {
             "verified": bool,
             "results": {
-                "tsc": {"passed": bool, "output": str},
-                "eslint": {"passed": bool, "output": str},
-                "test": {"passed": bool, "output": str},
+                "tsc": {"passed": bool, "output": str, "skipped": bool},
+                "eslint": {"passed": bool, "output": str, "skipped": bool},
+                "test": {"passed": bool, "output": str, "skipped": bool},
+                "build": {"passed": bool, "output": str, "skipped": bool},
             }
         }
     """
+    if config is None:
+        config = VerificationConfig()
+
     results = {
-        "tsc": {"passed": False, "output": ""},
-        "eslint": {"passed": False, "output": ""},
-        "test": {"passed": False, "output": ""},
+        "tsc": {"passed": False, "output": "", "skipped": config.skip_tsc},
+        "eslint": {"passed": False, "output": "", "skipped": config.skip_eslint},
+        "test": {"passed": False, "output": "", "skipped": config.skip_test},
+        "build": {"passed": False, "output": "", "skipped": config.skip_build},
     }
 
     # Find frontend directory
@@ -88,45 +134,78 @@ async def verify_patch(
         logger.error(f"verify_patch: No log entry found for patch_id {patch_id}")
         return {"verified": False, "results": results}
 
-    # Run verification checks
+    # Run verification checks with overall timeout
     try:
-        # TypeScript check
-        results["tsc"] = await _run_command_async(
-            TSC_COMMAND,
-            frontend_dir,
-            timeout=120,
-        )
+        async with asyncio.timeout(config.overall_timeout):
+            # TypeScript check
+            if not config.skip_tsc:
+                results["tsc"] = await _run_command_async(
+                    TSC_COMMAND,
+                    frontend_dir,
+                    timeout=config.tsc_timeout,
+                )
+                results["tsc"]["skipped"] = False
+            else:
+                results["tsc"]["passed"] = True
+                results["tsc"]["skipped"] = True
 
-        # ESLint check
-        results["eslint"] = await _run_command_async(
-            ESLINT_COMMAND,
-            frontend_dir,
-            timeout=120,
-        )
+            # ESLint check
+            if not config.skip_eslint:
+                results["eslint"] = await _run_command_async(
+                    ESLINT_COMMAND,
+                    frontend_dir,
+                    timeout=config.eslint_timeout,
+                )
+                results["eslint"]["skipped"] = False
+            else:
+                results["eslint"]["passed"] = True
+                results["eslint"]["skipped"] = True
 
-        # Unit tests
-        results["test"] = await _run_command_async(
-            TEST_COMMAND,
-            frontend_dir,
-            timeout=180,
-        )
+            # Unit tests
+            if not config.skip_test:
+                results["test"] = await _run_command_async(
+                    TEST_COMMAND,
+                    frontend_dir,
+                    timeout=config.test_timeout,
+                )
+                results["test"]["skipped"] = False
+            else:
+                results["test"]["passed"] = True
+                results["test"]["skipped"] = True
+
+            # Frontend build
+            if not config.skip_build:
+                results["build"] = await _run_command_async(
+                    BUILD_COMMAND,
+                    frontend_dir,
+                    timeout=config.build_timeout,
+                )
+                results["build"]["skipped"] = False
+            else:
+                results["build"]["passed"] = True
+                results["build"]["skipped"] = True
 
     except asyncio.TimeoutError:
-        logger.error("verify_patch: Verification timeout")
-        results["error"] = "Verification timeout"
+        logger.error("verify_patch: Overall verification timeout")
+        results["error"] = f"Verification timeout after {config.overall_timeout}s"
 
-    # Determine overall verification status
-    all_passed = (
-        results["tsc"]["passed"]
-        and results["eslint"]["passed"]
-        and results["test"]["passed"]
-    )
+    # Determine overall verification status (only consider non-skipped steps)
+    all_passed = True
+    for step in ["tsc", "eslint", "test", "build"]:
+        if not results[step]["skipped"] and not results[step]["passed"]:
+            all_passed = False
+            break
 
     # Update log entry
     log_entry.verified = {
         "tsc": results["tsc"]["passed"],
+        "tsc_skipped": results["tsc"]["skipped"],
         "eslint": results["eslint"]["passed"],
+        "eslint_skipped": results["eslint"]["skipped"],
         "test": results["test"]["passed"],
+        "test_skipped": results["test"]["skipped"],
+        "build": results["build"]["passed"],
+        "build_skipped": results["build"]["skipped"],
         "timestamp": datetime.utcnow().isoformat(),
     }
 

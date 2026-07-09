@@ -53,13 +53,54 @@ async def analyze_error(
             detail=f"Error {error_id} not found",
         )
 
-    # Analyze error
+    # Check if same fingerprint has already been analyzed (dedup)
+    if error.analysis_result is not None:
+        logger.info(
+            "analyze_error: fingerprint %s already analyzed, returning cached result",
+            error.fingerprint,
+        )
+        return {
+            "error_id": error_id,
+            "analysis": error.analysis_result,
+            "cached": True,
+        }
+
+    # Check if another error with same fingerprint has been analyzed
+    existing_result = await db.execute(
+        select(FrontendError).where(
+            FrontendError.fingerprint == error.fingerprint,
+            FrontendError.analysis_result.isnot(None),
+        ).limit(1)
+    )
+    existing_error = existing_result.scalar_one_or_none()
+
+    if existing_error and existing_error.id != error_id:
+        logger.info(
+            "analyze_error: fingerprint %s already analyzed in error %s, returning cached result",
+            error.fingerprint,
+            existing_error.id,
+        )
+        # Copy the cached analysis to this error
+        error.analysis_result = existing_error.analysis_result
+        await db.commit()
+        return {
+            "error_id": error_id,
+            "analysis": existing_error.analysis_result,
+            "cached": True,
+        }
+
+    # Analyze error with LLM
     analyzer = ErrorAnalyzer()
     analysis = await analyzer.analyze(error)
+
+    # Persist analysis result to database
+    error.analysis_result = analysis
+    await db.commit()
 
     return {
         "error_id": error_id,
         "analysis": analysis,
+        "cached": False,
     }
 
 

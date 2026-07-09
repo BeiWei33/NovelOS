@@ -536,7 +536,7 @@ class TestVerification:
 
     def test_verification_failure_triggers_rollback(self):
         """Verification failure triggers automatic rollback."""
-        from workflow.verification import verify_patch
+        from workflow.verification import verify_patch, VerificationConfig
         from database.models.auto_fix import AutoFixLog
 
         patch_id = str(uuid.uuid4())
@@ -580,15 +580,17 @@ class TestVerification:
                 patch("workflow.verification._run_command_async", new_callable=AsyncMock) as mock_run,
                 patch("workflow.verification.rollback_patch", new_callable=AsyncMock) as mock_rollback,
             ):
-                # First call passes, second fails (tsc passes, eslint fails)
+                # Create config to skip build step
+                config = VerificationConfig(skip_build=True)
+                # tsc passes, eslint fails
                 mock_run.side_effect = [
                     {"passed": True, "output": "TSC passed"},
                     {"passed": False, "output": "ESLint error"},
-                    {"passed": False, "output": "Tests skipped"},
+                    {"passed": True, "output": "Tests passed"},
                 ]
                 mock_rollback.return_value = {"rolled_back": True, "rollback_at": datetime.utcnow()}
                 result = loop.run_until_complete(
-                    verify_patch(patch_id=patch_id, db=db)
+                    verify_patch(patch_id=patch_id, db=db, config=config)
                 )
         finally:
             loop.close()

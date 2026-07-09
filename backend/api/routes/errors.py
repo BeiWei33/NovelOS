@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas import FrontendErrorCreate
 from database.session import get_session
 from database.models.canonical import FrontendError
+from sqlalchemy import delete as sa_delete
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _filter_sensitive(obj: Any) -> Any:
 # ─── Rate limiter ─────────────────────────────────────────────────────────────
 
 # {fingerprint: [timestamp, ...]} — stores arrival times in the last 60 s
-_rate_cache: dict[str, list[float]] = {}
+_fingerprint_hit_times: dict[str, list[float]] = {}
 _RATE_WINDOW_SECS = 60
 _RATE_MAX_HITS = 10
 
@@ -69,11 +70,11 @@ def _is_rate_limited(fingerprint: str) -> bool:
     now = time.monotonic()
     window_start = now - _RATE_WINDOW_SECS
 
-    hits = _rate_cache.get(fingerprint, [])
+    hits = _fingerprint_hit_times.get(fingerprint, [])
     # Prune old entries
     hits = [t for t in hits if t >= window_start]
     hits.append(now)
-    _rate_cache[fingerprint] = hits
+    _fingerprint_hit_times[fingerprint] = hits
 
     # Exceeded if we have *more than* the allowed maximum before this request
     # i.e. the list (including current request) exceeds the limit
@@ -139,6 +140,10 @@ async def report_error(
             payload.fingerprint,
             payload.severity,
         )
+
+        # Lazy cleanup: delete errors older than 30 days
+        await _cleanup_old_errors(db)
+
     except Exception as exc:
         logger.error(
             "ErrorAPI: failed to persist error fingerprint=%s: %s",
@@ -150,7 +155,53 @@ async def report_error(
     return {"received": True, "id": error_id}
 
 
+async def _cleanup_old_errors(db: AsyncSession) -> None:
+    """Delete frontend error records older than 30 days."""
+    from datetime import timedelta
+
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        delete_stmt = sa_delete(FrontendError).where(FrontendError.created_at < cutoff)
+        result = await db.execute(delete_stmt)
+        if result.rowcount > 0:
+            await db.commit()
+            logger.info(
+                "ErrorAPI: cleaned up %d error records older than 30 days",
+                result.rowcount,
+            )
+    except Exception as exc:
+        logger.warning(
+            "ErrorAPI: cleanup failed (non-fatal): %s", exc,
+        )
+        await db.rollback()
+
+
 # ─── GET Endpoint: List errors ─────────────────────────────────────────────────
+
+
+def _apply_filters(
+    query: Any,
+    type_filter: str | None,
+    severity_filter: str | None,
+    since_filter: str | None,
+) -> Any:
+    """Apply type, severity, and since filters to a query.
+
+    Mutates the query in place and returns it for chaining.
+    Invalid since dates are silently ignored.
+    """
+    if type_filter:
+        query = query.where(FrontendError.type == type_filter)
+    if severity_filter:
+        query = query.where(FrontendError.severity == severity_filter)
+    if since_filter:
+        try:
+            since_dt = datetime.fromisoformat(since_filter.replace("Z", "+00:00"))
+            query = query.where(FrontendError.created_at >= since_dt)
+        except ValueError:
+            pass
+    return query
+
 
 @router.get("")
 async def list_errors(
@@ -171,22 +222,11 @@ async def list_errors(
         { errors: [...], total: int, page: int, limit: int }
     """
     # Build base query with filters
-    base_query = select(FrontendError)
-
-    if type:
-        base_query = base_query.where(FrontendError.type == type)
-    if severity:
-        base_query = base_query.where(FrontendError.severity == severity)
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            base_query = base_query.where(FrontendError.created_at >= since_dt)
-        except ValueError:
-            pass  # Invalid date format, ignore filter
+    base_query = _apply_filters(select(FrontendError), type, severity, since)
 
     if aggregate:
         # Group by fingerprint and count
-        agg_query = (
+        agg_query = _apply_filters(
             select(
                 FrontendError.fingerprint,
                 func.count(FrontendError.id).label("count"),
@@ -200,20 +240,9 @@ async def list_errors(
                 FrontendError.severity,
                 FrontendError.message,
             )
-            .order_by(func.count(FrontendError.id).desc())
+            .order_by(func.count(FrontendError.id).desc()),
+            type, severity, since,
         )
-
-        # Apply same filters to aggregation query
-        if type:
-            agg_query = agg_query.where(FrontendError.type == type)
-        if severity:
-            agg_query = agg_query.where(FrontendError.severity == severity)
-        if since:
-            try:
-                since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-                agg_query = agg_query.where(FrontendError.created_at >= since_dt)
-            except ValueError:
-                pass
 
         result = await db.execute(agg_query)
         rows = result.all()
@@ -232,17 +261,9 @@ async def list_errors(
         return {"aggregations": aggregations}
 
     # Count total matching records
-    count_query = select(func.count(FrontendError.id))
-    if type:
-        count_query = count_query.where(FrontendError.type == type)
-    if severity:
-        count_query = count_query.where(FrontendError.severity == severity)
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            count_query = count_query.where(FrontendError.created_at >= since_dt)
-        except ValueError:
-            pass
+    count_query = _apply_filters(
+        select(func.count(FrontendError.id)), type, severity, since
+    )
 
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0

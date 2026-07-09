@@ -29,12 +29,12 @@ FACT_TYPES = [
     "new_information",
 ]
 
-# Keys written back into chapter.chapter_facts
+# Keys written back into chapter.chapter_facts (same as fact types per spec)
 SUMMARY_KEYS = [
-    "relationship_changes_summary",
-    "world_changes_summary",
-    "timeline_changes_summary",
-    "new_information_summary",
+    "relationship_changes",
+    "world_changes",
+    "timeline_changes",
+    "new_information",
 ]
 
 

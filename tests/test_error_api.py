@@ -202,7 +202,7 @@ class TestIsRateLimited:
     def setup_method(self):
         """Clear the rate cache before each test to avoid cross-test pollution."""
         from api.routes import errors as errors_module
-        errors_module._rate_cache.clear()
+        errors_module._fingerprint_hit_times.clear()
 
     def _limited(self, fp: str) -> bool:
         from api.routes.errors import _is_rate_limited
@@ -239,7 +239,7 @@ class TestIsRateLimited:
         from api.routes import errors as errors_module
         # Seed cache with 10 entries that are 61 seconds old (outside the window)
         old_time = time.monotonic() - 61
-        errors_module._rate_cache["fp-g"] = [old_time] * 10
+        errors_module._fingerprint_hit_times["fp-g"] = [old_time] * 10
         # The next request should NOT be rate-limited (old entries were pruned)
         assert self._limited("fp-g") is False
 
@@ -249,7 +249,7 @@ class TestIsRateLimited:
         old_time = time.monotonic() - 61
         # 5 old + 5 fresh entries already in cache (not yet counted for this call)
         fresh_times = [time.monotonic()] * 5
-        errors_module._rate_cache["fp-h"] = [old_time] * 5 + fresh_times
+        errors_module._fingerprint_hit_times["fp-h"] = [old_time] * 5 + fresh_times
         # Next call adds the 6th fresh entry → total = 6, still under 10
         assert self._limited("fp-h") is False
 

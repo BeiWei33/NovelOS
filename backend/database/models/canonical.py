@@ -250,4 +250,5 @@ class FrontendError(Base):
     context = Column(JSONB, default=dict, nullable=False)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
+    analysis_result = Column(JSONB, nullable=True)  # LLM analysis result
     created_at = Column(DateTime, default=utcnow, nullable=False)

@@ -100,10 +100,10 @@ class TestEmptyFacts:
 
 _SAMPLE_LLM_RESPONSE = """```json
 {
-  "relationship_changes_summary": "Alice 与 Bob 的关系由盟友转为对立。",
-  "world_changes_summary": "北方城市被摧毁，战争阴云笼罩全国。",
-  "timeline_changes_summary": "故事时间推进了三天，进入第七章节。",
-  "new_information_summary": "Bob 被揭露为卧底特工。"
+  "relationship_changes": "Alice 与 Bob 的关系由盟友转为对立。",
+  "world_changes": "北方城市被摧毁，战争阴云笼罩全国。",
+  "timeline_changes": "故事时间推进了三天，进入第七章节。",
+  "new_information": "Bob 被揭露为卧底特工。"
 }
 ```"""
 
@@ -113,7 +113,7 @@ class TestReturnValueFormat:
 
     @pytest.mark.asyncio
     async def test_returns_four_summary_keys(self):
-        """Result dict contains all four *_summary keys."""
+        """Result dict contains all four summary keys."""
         chapter = _make_chapter({
             "relationship_changes": [{"actor": "Alice", "target": "Bob", "fact_type": "relationship_changes"}],
         })
@@ -125,10 +125,10 @@ class TestReturnValueFormat:
             from workflow.memory_updater import run_memory_updater
             result = await run_memory_updater(db, "chapter-42")
 
-        assert "relationship_changes_summary" in result
-        assert "world_changes_summary" in result
-        assert "timeline_changes_summary" in result
-        assert "new_information_summary" in result
+        assert "relationship_changes" in result
+        assert "world_changes" in result
+        assert "timeline_changes" in result
+        assert "new_information" in result
 
     @pytest.mark.asyncio
     async def test_summary_values_are_strings(self):
@@ -145,10 +145,10 @@ class TestReturnValueFormat:
             result = await run_memory_updater(db, "chapter-42")
 
         for key in [
-            "relationship_changes_summary",
-            "world_changes_summary",
-            "timeline_changes_summary",
-            "new_information_summary",
+            "relationship_changes",
+            "world_changes",
+            "timeline_changes",
+            "new_information",
         ]:
             assert isinstance(result[key], str), f"{key} should be str, got {type(result[key])}"
 
@@ -186,13 +186,15 @@ class TestReturnValueFormat:
             from workflow.memory_updater import run_memory_updater
             await run_memory_updater(db, "chapter-1")
 
-        # chapter.chapter_facts should have been updated
-        assert "relationship_changes_summary" in chapter.chapter_facts
+        # chapter.chapter_facts should have been updated with summaries (same key names)
+        assert "relationship_changes" in chapter.chapter_facts
+        # The raw list should be replaced with summary string
+        assert isinstance(chapter.chapter_facts["relationship_changes"], str)
 
     @pytest.mark.asyncio
     async def test_missing_summary_keys_default_to_empty_string(self):
         """If LLM omits some summary keys, they default to empty string."""
-        incomplete_response = '{"relationship_changes_summary": "some summary"}'
+        incomplete_response = '{"relationship_changes": "some summary"}'
         chapter = _make_chapter({
             "relationship_changes": [{"actor": "X", "target": "Y", "fact_type": "relationship_changes"}],
         })
@@ -204,7 +206,7 @@ class TestReturnValueFormat:
             from workflow.memory_updater import run_memory_updater
             result = await run_memory_updater(db, "chapter-1")
 
-        assert result["relationship_changes_summary"] == "some summary"
-        assert result["world_changes_summary"] == ""
-        assert result["timeline_changes_summary"] == ""
-        assert result["new_information_summary"] == ""
+        assert result["relationship_changes"] == "some summary"
+        assert result["world_changes"] == ""
+        assert result["timeline_changes"] == ""
+        assert result["new_information"] == ""
