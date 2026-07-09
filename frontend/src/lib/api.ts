@@ -129,4 +129,18 @@ export const api = {
       `/styles?novel_id=${novelId}`
     )
   },
+
+  // ─── Knowledge Status ─────────────────────────────────────────────────
+
+  async getSceneKnowledgeStatus(sceneId: string) {
+    return request<{
+      scene_id: string
+      status: "not_generated" | "stale" | "up_to_date"
+      scene_version: number
+      artifact_version: number | null
+      keyword_count: number
+      entity_count: number
+      block_count: number
+    }>(`/scenes/${sceneId}/knowledge-status`)
+  },
 }

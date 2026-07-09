@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { Novel } from "@/types/domain";
+import type { Novel, Chapter, Scene } from "@/types/domain";
 
 export default function Home() {
   const [novels, setNovels] = useState<Novel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{novel: Novel, chapter?: Chapter, scene?: Scene}[]>([]);
 
   async function loadNovels() {
     setLoading(true);
@@ -24,6 +26,20 @@ export default function Home() {
 
   useEffect(() => {
     loadNovels();
+  }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl+S to save (delegated to active editor)
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        // Save event is handled by the active editor component
+        window.dispatchEvent(new CustomEvent("novelos-save"));
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   async function handleCreate() {
@@ -48,12 +64,60 @@ export default function Home() {
     }
   }
 
+  // Search across all novels
+  async function handleSearch() {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    // Simple client-side search for now
+    const results: {novel: Novel, chapter?: Chapter, scene?: Scene}[] = [];
+    for (const novel of novels) {
+      if (novel.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+        results.push({ novel });
+      }
+    }
+    setSearchResults(results);
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(handleSearch, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, novels]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold tracking-tight">NovelOS</h1>
-          <span className="text-xs text-gray-500">AI Writer IDE</span>
+          <div className="flex items-center gap-4">
+            {/* Global search */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索小说..."
+                className="w-48 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute top-full mt-1 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-lg z-50">
+                  {searchResults.slice(0, 5).map((r, i) => (
+                    <a
+                      key={i}
+                      href={`/novels/${r.novel.id}`}
+                      className="block px-3 py-2 text-sm hover:bg-gray-800"
+                    >
+                      {r.novel.title}
+                      {r.chapter && ` / ${r.chapter.title}`}
+                      {r.scene && ` / 场景 ${r.scene.order}`}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-xs text-gray-500">AI Writer IDE</span>
+          </div>
         </div>
       </header>
 
@@ -103,6 +167,11 @@ export default function Home() {
             ))}
           </div>
         )}
+
+        {/* Keyboard shortcuts hint */}
+        <div className="mt-8 text-center text-xs text-gray-600">
+          <span className="px-2 py-1 bg-gray-800 rounded">Ctrl+S</span> 保存当前编辑
+        </div>
       </main>
 
       {showCreate && (

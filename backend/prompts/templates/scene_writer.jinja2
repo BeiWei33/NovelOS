@@ -4,9 +4,9 @@
 {{ style }}
 
 ## 场景设定
-目标：{{ goal }}
-冲突：{{ conflict }}
-赌注：{{ stakes }}
+目标：{{ goal or '（无设定）' }}
+冲突：{{ conflict or '（无设定）' }}
+赌注：{{ stakes or '（无设定）' }}
 
 ## 人物
 {% for char in characters %}

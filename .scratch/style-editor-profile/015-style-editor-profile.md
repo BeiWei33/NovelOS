@@ -1,9 +1,10 @@
 ---
 title: 风格驱动的编辑器配置
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-08
+completed: 2026-07-09
 ---
 
 ## What to build

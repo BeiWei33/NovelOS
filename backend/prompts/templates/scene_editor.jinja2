@@ -1,0 +1,41 @@
+你是专业小说编辑，对一段小说文本做去AI味处理。
+
+## 规则集
+{% for rule in rules %}
+### {{ rule.id }}: {{ rule.name }}
+描述：{{ rule.description }}
+需要检查的模式：{{ rule.patterns | join(', ') }}
+修复方向：{{ rule.fix_hint }}
+{% endfor %}
+
+## 人物
+{% if character_names %}
+本场景中出现的人物：{{ character_names | join(', ') }}
+{% endif %}
+
+## 场景原文
+{{ document }}
+
+## 任务
+逐 block 检查场景，找到违反上述规则的地方，输出 Patch 增量修改。
+
+输出格式：
+```json
+{
+  "patches": [
+    {
+      "op": "replace",
+      "block_index": 0,
+      "old_text": "原始文本片段（精确匹配）",
+      "new_text": "修改后的文本",
+      "rule": "Rule001",
+      "reason": "违反了什么规则"
+    }
+  ]
+}
+```
+
+op 可选：replace（替换）、delete（删除）、insert（插入）
+只输出有问题的 block，没有问题的不要输出。
+不要修改对话内容（dialogue type），只改叙述和描写。
+不要做润色，只修复 AI 痕迹。

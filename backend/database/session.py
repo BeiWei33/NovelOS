@@ -28,8 +28,9 @@ def get_engine():
 def get_session_factory():
     global _async_session_factory
     if _async_session_factory is None:
+        from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
         _async_session_factory = async_sessionmaker(
-            get_engine(), class_=AsyncSession, expire_on_commit=False
+            get_engine(), class_=_AsyncSession, expire_on_commit=False
         )
     return _async_session_factory
 
@@ -39,5 +40,9 @@ class Base(DeclarativeBase):
 
 
 async def get_session() -> AsyncSession:  # type: ignore
-    async with get_session_factory() as session:
+    factory = get_session_factory()
+    session = factory()
+    try:
         yield session
+    finally:
+        await session.close()

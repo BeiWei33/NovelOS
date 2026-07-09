@@ -144,7 +144,28 @@ function SceneEditor({
   const [blocks, setBlocks] = useState(scene.document.blocks);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [polishing, setPolishing] = useState(false);
   const [message, setMessage] = useState("");
+  const [qualityResult, setQualityResult] = useState<{
+    patches_applied: number;
+    issues: Array<{ type: string; severity: string; description: string }>;
+  } | null>(null);
+  const [knowledgeStatus, setKnowledgeStatus] = useState<{
+    status: "not_generated" | "stale" | "up_to_date";
+  } | null>(null);
+
+  // Load knowledge status on mount
+  useEffect(() => {
+    async function loadKnowledgeStatus() {
+      try {
+        const status = await api.getSceneKnowledgeStatus(scene.id);
+        setKnowledgeStatus({ status: status.status });
+      } catch (e) {
+        console.error("Failed to load knowledge status", e);
+      }
+    }
+    loadKnowledgeStatus();
+  }, [scene.id, scene.version]);
 
   async function handleSave() {
     setSaving(true);
@@ -184,6 +205,35 @@ function SceneEditor({
     } finally {
       setGenerating(false);
       setTimeout(() => setMessage(""), 3000);
+    }
+  }
+
+  async function handlePolish() {
+    setPolishing(true);
+    setMessage("");
+    setQualityResult(null);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API_BASE}/skills/polish/${scene.id}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      const data = await res.json();
+      setBlocks(data.document?.blocks || blocks);
+      setQualityResult({
+        patches_applied: data.patches_applied || 0,
+        issues: data.issues || [],
+      });
+      setMessage(`润色完成: ${data.patches_applied} 处修改, ${data.issues_count} 个问题`);
+      await onSave();
+    } catch (e) {
+      setMessage("润色失败");
+      console.error(e);
+    } finally {
+      setPolishing(false);
     }
   }
 
@@ -233,6 +283,20 @@ function SceneEditor({
         <span className="text-sm text-gray-400">
           v{scene.version}
         </span>
+        {/* Knowledge status badge */}
+        {knowledgeStatus && (
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            knowledgeStatus.status === "up_to_date"
+              ? "bg-green-900/50 text-green-400"
+              : knowledgeStatus.status === "stale"
+              ? "bg-yellow-900/50 text-yellow-400"
+              : "bg-gray-800 text-gray-500"
+          }`}>
+            {knowledgeStatus.status === "up_to_date" ? "知识就绪"
+              : knowledgeStatus.status === "stale" ? "知识过期"
+              : "未生成知识"}
+          </span>
+        )}
         <div className="flex-1" />
         <button
           onClick={() => addBlock("narration")}
@@ -265,6 +329,13 @@ function SceneEditor({
           className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded text-sm font-medium transition-colors"
         >
           {generating ? "生成中..." : "AI 写场景"}
+        </button>
+        <button
+          onClick={handlePolish}
+          disabled={polishing}
+          className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 rounded text-sm font-medium transition-colors"
+        >
+          {polishing ? "润色中..." : "一键润色"}
         </button>
         <div className="w-px h-5 bg-gray-700 mx-1" />
         <button
@@ -340,6 +411,42 @@ function SceneEditor({
           ))
         )}
       </div>
+
+      {/* Quality Result Panel */}
+      {qualityResult && (qualityResult.patches_applied > 0 || qualityResult.issues.length > 0) && (
+        <div className="border-t border-gray-800 p-4 bg-gray-900/50">
+          <h4 className="text-sm font-medium mb-2">润色结果</h4>
+          <div className="flex gap-4 text-sm">
+            {qualityResult.patches_applied > 0 && (
+              <span className="text-amber-400">
+                {qualityResult.patches_applied} 处 AI 痕迹已修复
+              </span>
+            )}
+            {qualityResult.issues.length > 0 && (
+              <span className="text-red-400">
+                {qualityResult.issues.length} 个一致性问题
+              </span>
+            )}
+          </div>
+          {qualityResult.issues.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {qualityResult.issues.slice(0, 3).map((issue, i) => (
+                <div key={i} className="text-xs">
+                  <span className={issue.severity === "error" ? "text-red-400" : "text-yellow-400"}>
+                    [{issue.severity}]
+                  </span>{" "}
+                  <span className="text-gray-400">{issue.description}</span>
+                </div>
+              ))}
+              {qualityResult.issues.length > 3 && (
+                <div className="text-xs text-gray-500">
+                  还有 {qualityResult.issues.length - 3} 个问题...
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

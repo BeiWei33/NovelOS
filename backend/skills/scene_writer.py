@@ -64,7 +64,7 @@ class SceneWriterSkill(Skill):
         elapsed_ms = int((time.time() - start) * 1000)
 
         # Parse JSON from response
-        blocks = self._parse_blocks(response)
+        blocks = self._validate_blocks(self._parse_blocks(response))
 
         return {
             "document": {"blocks": blocks},

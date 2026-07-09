@@ -163,3 +163,32 @@ class TestKnowledgeLayer:
         ]
         # Can't call assemble without DB session, but the class should exist
         assert ContextAssembler is not None
+
+    def test_scene_editor_manifest(self):
+        from skills.scene_editor import SCENE_EDITOR_MANIFEST, DESLOP_RULES
+        assert SCENE_EDITOR_MANIFEST.name == "SceneEditor"
+        assert SCENE_EDITOR_MANIFEST.role == "scene-editor"
+        assert len(DESLOP_RULES) == 4
+
+    def test_consistency_checker_manifest(self):
+        from skills.consistency_checker import CONSISTENCY_CHECKER_MANIFEST
+        assert CONSISTENCY_CHECKER_MANIFEST.name == "ConsistencyChecker"
+        assert CONSISTENCY_CHECKER_MANIFEST.role == "consistency-checker"
+
+    def test_quality_pipeline_apply_patches(self):
+        from workflow.quality_pipeline import apply_patches
+        doc = {
+            "blocks": [
+                {"id": "1", "type": "narration", "content": "他感到非常悲伤"},
+            ]
+        }
+        patches = [
+            {
+                "op": "replace",
+                "block_index": 0,
+                "old_text": "他感到非常悲伤",
+                "new_text": "他垂下了头，眼泪滴落",
+            }
+        ]
+        result = apply_patches(doc, patches)
+        assert "他垂下了头" in result["blocks"][0]["content"]

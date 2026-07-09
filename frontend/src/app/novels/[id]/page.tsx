@@ -275,7 +275,7 @@ export default function NovelDetail() {
                 {characters.map((c) => (
                   <div
                     key={c.id}
-                    className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg group"
                   >
                     <span className="font-medium">{c.name}</span>
                     {c.age && <span className="text-sm text-gray-400">{c.age}岁</span>}
@@ -363,11 +363,38 @@ export default function NovelDetail() {
                     key={s.id}
                     className="flex items-center justify-between p-3 bg-gray-900 border border-gray-800 rounded-lg group"
                   >
-                    <div>
+                    <div className="flex-1">
                       <span className="font-medium">{s.name}</span>
-                      <pre className="mt-2 text-xs text-gray-500 overflow-x-auto">
-                        {JSON.stringify(s.profile, null, 2)}
-                      </pre>
+                      {/* Style profile visual indicators */}
+                      {s.profile && (
+                        <div className="flex gap-2 mt-1.5">
+                          {s.profile.pace && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">
+                              节奏: {s.profile.pace}
+                            </span>
+                          )}
+                          {s.profile.emotion && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">
+                              情感: {s.profile.emotion}
+                            </span>
+                          )}
+                          {s.profile.sentence && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">
+                              句式: {s.profile.sentence}
+                            </span>
+                          )}
+                          {s.profile.humor && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">
+                              幽默: {s.profile.humor}
+                            </span>
+                          )}
+                          {s.profile.dialog_ratio !== undefined && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">
+                              对话: {Math.round(s.profile.dialog_ratio * 100)}%
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleDeleteStyle(s.id)}

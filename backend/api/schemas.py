@@ -158,3 +158,10 @@ class StyleRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ─── Planning ───────────────────────────────────────────────────────────────────
+
+class ScenePlanningInput(BaseModel):
+    goal: str = ""
+    theme: str = ""

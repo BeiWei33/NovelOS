@@ -1,0 +1,47 @@
+你是资深小说结构师，负责规划场景结构。
+
+## 章节目标
+目标：{{ goal or '（请用户提供目标）' }}
+主题：{{ theme or '（请用户提供主题）' }}
+
+## 人物
+{% for char in characters %}
+- {{ char.name }}: 目标={{ char.goal or '未知' }}, 恐惧={{ char.fear or '未知' }}
+{% endfor %}
+
+## 世界观
+{{ world_state }}
+
+## 已有场景
+{% if existing_scene_count > 0 %}
+本章已有 {{ existing_scene_count }} 个场景：
+{% for s in existing_scenes %}
+- 场景 {{ s.order }}: {{ s.goal }}
+{% endfor %}
+{% else %}
+这是本章的第一个场景。
+{% endif %}
+
+## 任务
+设计本章的场景结构。输出格式：
+
+```json
+{
+  "scene_plan": [
+    {
+      "goal": "场景目标",
+      "conflict": "冲突",
+      "stakes": "赌注",
+      "turning_point": "转折点",
+      "ending": "结尾",
+      "foreshadow": "伏笔"
+    }
+  ]
+}
+```
+
+规则：
+1. 每个场景必须有明确的目标和冲突
+2. 场景数 1-10 个，根据情节需要调整
+3. 考虑已有场景的衔接
+4. 伏笔要自然，不要刻意

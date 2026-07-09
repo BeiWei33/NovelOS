@@ -61,7 +61,7 @@ class ProviderRouter:
             "openai": OpenAIAdapter(),
         }
 
-    def execute(
+    async def execute(
         self,
         messages: list[dict[str, str]],
         profile: ExecutionProfile,
@@ -69,7 +69,7 @@ class ProviderRouter:
         adapter = self._adapters.get(profile.provider)
         if adapter is None:
             raise ValueError(f"Unknown provider: {profile.provider}")
-        return adapter.chat(messages, profile)
+        return await adapter.chat(messages, profile)
 
 
 router = ProviderRouter()
