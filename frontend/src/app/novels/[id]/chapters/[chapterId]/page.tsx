@@ -1,10 +1,12 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { Scene, Style } from "@/types/domain";
 import { captureError } from "@/lib/error";
+import { NavigationTree } from "@/components/NavigationTree";
+import { ScenePlanningPanel } from "@/components/ScenePlanningPanel";
 
 export default function ChapterDetail() {
   const params = useParams();
@@ -20,6 +22,7 @@ export default function ChapterDetail() {
   const [generateGoal, setGenerateGoal] = useState("");
   const [generateTheme, setGenerateTheme] = useState("");
   const [styles, setStyles] = useState<Style[]>([]);
+  const [navCollapsed, setNavCollapsed] = useState(false);
 
   async function loadScenes() {
     setLoading(true);
@@ -31,6 +34,7 @@ export default function ChapterDetail() {
     } catch (e) {
       captureError(e, { page: "chapter-detail", action: "load-scenes", novelId, chapterId });
     } finally {
+      setLoading(false);
     }
   }
 
@@ -71,71 +75,71 @@ export default function ChapterDetail() {
     }
   }
 
+  function handleSceneSelect(scene: Scene) {
+    setSelectedScene(scene);
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
-      {/* Left: Scene list */}
-      <aside className="w-64 border-r border-gray-800 flex flex-col">
-        <div className="p-3 border-b border-gray-800">
-          <a
-            href={`/novels/${novelId}`}
-            className="text-sm text-gray-500 hover:text-gray-300"
+      {/* Left: Navigation Tree */}
+      {navCollapsed ? (
+        <button
+          onClick={() => setNavCollapsed(false)}
+          className="w-12 h-12 flex items-center justify-center bg-gray-900 border-r border-gray-800 text-gray-400 hover:text-gray-200 transition-colors shrink-0"
+          title="展开导航"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            ← 返回
-          </a>
-        </div>
-        <div className="p-3 border-b border-gray-800">
-          <button
-            onClick={() => setShowGenerateChapter(true)}
-            disabled={generatingChapter}
-            className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
-          >
-            {generatingChapter ? "生成中..." : "一键生成整章"}
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {loading ? (
-            <p className="text-sm text-gray-500 text-center py-4">加载中...</p>
-          ) : scenes.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">暂无场景</p>
-          ) : (
-            <div className="space-y-1">
-              {scenes.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedScene(s)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedScene?.id === s.id
-                      ? "bg-indigo-600/20 text-indigo-300 border border-indigo-600/30"
-                      : "text-gray-400 hover:bg-gray-800 border border-transparent"
-                  }`}
-                >
-                  <span className="text-xs text-gray-600 mr-2">#{s.order}</span>
-                  {s.planning?.goal || `场景 ${s.order}`}
-                  <span className="text-xs text-gray-600 ml-auto">v{s.version}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="p-3 border-t border-gray-800">
-          <button
-            onClick={() => setShowCreateScene(true)}
-            className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            + 新场景
-          </button>
-        </div>
-      </aside>
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      ) : (
+        <NavigationTree
+          novelId={novelId}
+          currentChapterId={chapterId}
+          currentSceneId={selectedScene?.id}
+          onSceneSelect={handleSceneSelect}
+        />
+      )}
 
       {/* Right: Scene editor */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Tabs */}
+        <div className="border-b border-gray-800 px-4 py-2 flex items-center gap-2">
+          <a
+            href={`/novels/${novelId}/chapters/${chapterId}/overview`}
+            className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            概览
+          </a>
+          <span className="px-3 py-1.5 text-sm font-medium text-indigo-400 border-b-2 border-indigo-500">
+            场景编辑器
+          </span>
+          <div className="flex-1" />
+        </div>
         {selectedScene ? (
-          <SceneEditor scene={selectedScene} onSave={loadScenes} novelId={novelId} />
+          <SceneEditor
+            scene={selectedScene}
+            onSave={loadScenes}
+            novelId={novelId}
+            styles={styles}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <p className="text-lg mb-2">选择一个场景开始编辑</p>
-              <p className="text-sm">或在左侧创建新场景</p>
+              <p className="text-sm">或在左侧导航创建新场景</p>
             </div>
           </div>
         )}
@@ -230,10 +234,12 @@ function SceneEditor({
   scene,
   onSave,
   novelId,
+  styles,
 }: {
   scene: Scene;
   onSave: () => Promise<void>;
   novelId: string;
+  styles: Style[];
 }) {
   const [blocks, setBlocks] = useState(scene.document.blocks);
   const [saving, setSaving] = useState(false);
@@ -247,15 +253,11 @@ function SceneEditor({
   const [knowledgeStatus, setKnowledgeStatus] = useState<{
     status: "not_generated" | "stale" | "up_to_date";
   } | null>(null);
-  const [styles, setStyles] = useState<Style[]>([]);
 
+  // Sync blocks when scene changes
   useEffect(() => {
-    if (novelId) {
-      api.listStyles(novelId).then(setStyles).catch((e) =>
-        captureError(e, { page: "chapter-detail", action: "load-styles", novelId })
-      );
-    }
-  }, [novelId]);
+    setBlocks(scene.document.blocks);
+  }, [scene.id, scene.document.blocks]);
 
   // Load knowledge status on mount
   useEffect(() => {
@@ -380,9 +382,9 @@ function SceneEditor({
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Toolbar */}
-      <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-2">
+      <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-2 flex-wrap">
         <span className="text-sm text-gray-400">
           v{scene.version}
         </span>
@@ -465,97 +467,103 @@ function SceneEditor({
         )}
       </div>
 
-      {/* Blocks */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {blocks.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
-            <p className="mb-3">场景为空</p>
-            <p className="text-sm">点击上方按钮添加段落</p>
-          </div>
-        ) : (
-          blocks.map((block, i) => (
-            <div
-              key={block.id || i}
-              className={`group relative rounded-lg bg-gray-900/50 ${blockStyles[block.type] || blockStyles.narration}`}
-            >
-              {/* Type selector */}
-              <div className="flex items-center gap-1 px-3 pt-1.5 pb-0.5">
-                <select
-                  value={block.type}
-                  onChange={(e) => changeBlockType(i, e.target.value)}
-                  className="text-xs bg-transparent text-gray-500 border-none focus:outline-none cursor-pointer"
-                >
-                  {[
-                    "narration",
-                    "dialogue",
-                    "description",
-                    "inner_monologue",
-                    "emotion",
-                    "letter",
-                    "phone_message",
-                    "flashback",
-                    "system_message",
-                  ].map((t) => (
-                    <option key={t} value={t} className="bg-gray-800">
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex-1" />
-                <button
-                  onClick={() => removeBlock(i)}
-                  className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-300 transition-opacity"
-                >
-                  删除
-                </button>
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Blocks */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {blocks.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+              <p className="mb-3">场景为空</p>
+              <p className="text-sm">点击上方按钮添加段落</p>
+            </div>
+          ) : (
+            blocks.map((block, i) => (
+              <div
+                key={block.id || i}
+                className={`group relative rounded-lg bg-gray-900/50 ${blockStyles[block.type] || blockStyles.narration}`}
+              >
+                {/* Type selector */}
+                <div className="flex items-center gap-1 px-3 pt-1.5 pb-0.5">
+                  <select
+                    value={block.type}
+                    onChange={(e) => changeBlockType(i, e.target.value)}
+                    className="text-xs bg-transparent text-gray-500 border-none focus:outline-none cursor-pointer"
+                  >
+                    {[
+                      "narration",
+                      "dialogue",
+                      "description",
+                      "inner_monologue",
+                      "emotion",
+                      "letter",
+                      "phone_message",
+                      "flashback",
+                      "system_message",
+                    ].map((t) => (
+                      <option key={t} value={t} className="bg-gray-800">
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => removeBlock(i)}
+                    className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-300 transition-opacity"
+                  >
+                    删除
+                  </button>
+                </div>
+                {/* Content */}
+                <textarea
+                  value={block.content}
+                  onChange={(e) => updateBlock(i, e.target.value)}
+                  placeholder="在此输入文本..."
+                  className="w-full bg-transparent px-3 pb-3 pt-1 text-sm resize-none focus:outline-none placeholder-gray-600 min-h-[60px]"
+                />
               </div>
-              {/* Content */}
-              <textarea
-                value={block.content}
-                onChange={(e) => updateBlock(i, e.target.value)}
-                placeholder="在此输入文本..."
-                className="w-full bg-transparent px-3 pb-3 pt-1 text-sm resize-none focus:outline-none placeholder-gray-600 min-h-[60px]"
-              />
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Quality Result Panel */}
-      {qualityResult && (qualityResult.patches_applied > 0 || qualityResult.issues.length > 0) && (
-        <div className="border-t border-gray-800 p-4 bg-gray-900/50">
-          <h4 className="text-sm font-medium mb-2">润色结果</h4>
-          <div className="flex gap-4 text-sm">
-            {qualityResult.patches_applied > 0 && (
-              <span className="text-amber-400">
-                {qualityResult.patches_applied} 处 AI 痕迹已修复
-              </span>
-            )}
-            {qualityResult.issues.length > 0 && (
-              <span className="text-red-400">
-                {qualityResult.issues.length} 个一致性问题
-              </span>
-            )}
-          </div>
-          {qualityResult.issues.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {qualityResult.issues.slice(0, 3).map((issue, i) => (
-                <div key={i} className="text-xs">
-                  <span className={issue.severity === "error" ? "text-red-400" : "text-yellow-400"}>
-                    [{issue.severity}]
-                  </span>{" "}
-                  <span className="text-gray-400">{issue.description}</span>
-                </div>
-              ))}
-              {qualityResult.issues.length > 3 && (
-                <div className="text-xs text-gray-500">
-                  还有 {qualityResult.issues.length - 3} 个问题...
-                </div>
-              )}
-            </div>
+            ))
           )}
         </div>
-      )}
+
+        {/* Quality Result Panel */}
+        {qualityResult && (qualityResult.patches_applied > 0 || qualityResult.issues.length > 0) && (
+          <div className="border-t border-gray-800 p-4 bg-gray-900/50">
+            <h4 className="text-sm font-medium mb-2">润色结果</h4>
+            <div className="flex gap-4 text-sm">
+              {qualityResult.patches_applied > 0 && (
+                <span className="text-amber-400">
+                  {qualityResult.patches_applied} 处 AI 痕迹已修复
+                </span>
+              )}
+              {qualityResult.issues.length > 0 && (
+                <span className="text-red-400">
+                  {qualityResult.issues.length} 个一致性问题
+                </span>
+              )}
+            </div>
+            {qualityResult.issues.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {qualityResult.issues.slice(0, 3).map((issue, i) => (
+                  <div key={i} className="text-xs">
+                    <span className={issue.severity === "error" ? "text-red-400" : "text-yellow-400"}>
+                      [{issue.severity}]
+                    </span>{" "}
+                    <span className="text-gray-400">{issue.description}</span>
+                  </div>
+                ))}
+                {qualityResult.issues.length > 3 && (
+                  <div className="text-xs text-gray-500">
+                    还有 {qualityResult.issues.length - 3} 个问题...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Scene Planning Panel */}
+        <ScenePlanningPanel scene={scene} onUpdate={onSave} />
+      </div>
     </div>
   );
 }

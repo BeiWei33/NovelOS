@@ -477,7 +477,12 @@ export default function NovelDetail() {
                     key={c.id}
                     className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg group"
                   >
-                    <span className="font-medium">{c.name}</span>
+                    <a
+                      href={`/novels/${novelId}/characters/${c.id}`}
+                      className="font-medium hover:text-indigo-400 transition-colors"
+                    >
+                      {c.name}
+                    </a>
                     {c.age && <span className="text-sm text-gray-400">{c.age}岁</span>}
                     {c.occupation && (
                       <span className="text-sm text-gray-500">{c.occupation}</span>
@@ -491,11 +496,17 @@ export default function NovelDetail() {
                           {t}
                         </span>
                       ))}
+                      <a
+                        href={`/novels/${novelId}/characters/${c.id}`}
+                        className="text-indigo-400 hover:text-indigo-300 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        详情
+                      </a>
                       <button
                         onClick={() => openCharEdit(c)}
                         className="text-indigo-400 hover:text-indigo-300 text-xs opacity-0 group-hover:opacity-100 transition-all"
                       >
-                        编辑
+                        快速编辑
                       </button>
                       <button
                         onClick={() => handleDeleteCharacter(c.id)}

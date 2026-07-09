@@ -82,6 +82,34 @@ async def delete_chapter(db: AsyncSession, chapter_id: str) -> bool:
     return True
 
 
+async def update_chapter(
+    db: AsyncSession,
+    chapter_id: str,
+    data: schemas.ChapterUpdate,
+) -> Optional[Chapter]:
+    chapter = await get_chapter(db, chapter_id)
+    if chapter is None:
+        return None
+
+    if data.title is not None:
+        chapter.title = data.title
+    if data.order is not None:
+        chapter.order = data.order
+    if data.planning is not None:
+        chapter.planning = data.planning
+    if data.summary is not None:
+        chapter.summary = data.summary
+    if data.consistency is not None:
+        chapter.consistency = data.consistency
+    if data.chapter_facts is not None:
+        chapter.chapter_facts = data.chapter_facts
+    chapter.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(chapter)
+    return chapter
+
+
 # ─── Scene ────────────────────────────────────────────────────────────────────
 
 async def create_scene(db: AsyncSession, data: schemas.SceneCreate) -> Scene:
@@ -162,6 +190,11 @@ async def list_characters(db: AsyncSession, novel_id: str) -> list[Character]:
         select(Character).where(Character.novel_id == novel_id)
     )
     return list(result.scalars().all())
+
+
+async def get_character(db: AsyncSession, character_id: str) -> Optional[Character]:
+    result = await db.execute(select(Character).where(Character.id == character_id))
+    return result.scalar_one_or_none()
 
 
 async def delete_character(db: AsyncSession, character_id: str) -> bool:

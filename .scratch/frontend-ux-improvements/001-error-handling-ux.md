@@ -1,6 +1,6 @@
 ---
 title: 章节创建错误处理与页面状态恢复
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

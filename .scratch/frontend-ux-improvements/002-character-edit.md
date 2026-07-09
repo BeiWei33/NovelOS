@@ -1,6 +1,6 @@
 ---
 title: Character 编辑功能（CRUD 完善）
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

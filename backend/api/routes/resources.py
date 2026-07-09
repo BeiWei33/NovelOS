@@ -21,6 +21,14 @@ async def list_characters(novel_id: str, db: AsyncSession = Depends(get_session)
     return await crud.list_characters(db, novel_id)
 
 
+@router.get("/characters/{character_id}", response_model=schemas.CharacterRead)
+async def get_character(character_id: str, db: AsyncSession = Depends(get_session)):
+    char = await crud.get_character(db, character_id)
+    if char is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
+    return char
+
+
 @router.delete("/characters/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_character(character_id: str, db: AsyncSession = Depends(get_session)):
     deleted = await crud.delete_character(db, character_id)

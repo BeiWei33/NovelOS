@@ -49,6 +49,20 @@ export const api = {
     return request<import("../types/domain").Chapter>(`/chapters/${id}`)
   },
 
+  async updateChapter(id: string, data: Partial<{
+    title: string
+    order: number
+    planning: Record<string, unknown>
+    summary: Record<string, unknown>
+    consistency: Record<string, unknown>
+    chapter_facts: Record<string, unknown>
+  }>) {
+    return request<import("../types/domain").Chapter>(`/chapters/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  },
+
   async createChapter(data: {
     novel_id: string
     order: number
@@ -99,6 +113,10 @@ export const api = {
     return request<import("../types/domain").Character[]>(
       `/characters?novel_id=${novelId}`
     )
+  },
+
+  async getCharacter(id: string) {
+    return request<import("../types/domain").Character>(`/characters/${id}`)
   },
 
   async createCharacter(data: {

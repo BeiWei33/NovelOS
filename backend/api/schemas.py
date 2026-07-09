@@ -51,6 +51,15 @@ class ChapterRead(BaseModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class ChapterUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    order: Optional[int] = None
+    planning: Optional[dict[str, Any]] = None
+    summary: Optional[dict[str, Any]] = None
+    consistency: Optional[dict[str, Any]] = None
+    chapter_facts: Optional[dict[str, Any]] = None
+
+
 # ─── Scene ────────────────────────────────────────────────────────────────────
 
 class SceneBlock(BaseModel):

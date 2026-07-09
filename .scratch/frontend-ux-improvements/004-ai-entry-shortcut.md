@@ -1,6 +1,6 @@
 ---
 title: AI 生成入口优化
-status: open
+status: done
 labels:
   - ready-for-human
 created: 2026-07-09
