@@ -55,8 +55,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: novelos-frontend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
     volumes:

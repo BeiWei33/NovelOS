@@ -130,7 +130,7 @@ export default function ChapterDetail() {
       {/* Right: Scene editor */}
       <main className="flex-1 flex flex-col">
         {selectedScene ? (
-          <SceneEditor scene={selectedScene} onSave={loadScenes} />
+          <SceneEditor scene={selectedScene} onSave={loadScenes} novelId={novelId} />
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
@@ -229,9 +229,11 @@ export default function ChapterDetail() {
 function SceneEditor({
   scene,
   onSave,
+  novelId,
 }: {
   scene: Scene;
   onSave: () => Promise<void>;
+  novelId: string;
 }) {
   const [blocks, setBlocks] = useState(scene.document.blocks);
   const [saving, setSaving] = useState(false);
@@ -245,6 +247,13 @@ function SceneEditor({
   const [knowledgeStatus, setKnowledgeStatus] = useState<{
     status: "not_generated" | "stale" | "up_to_date";
   } | null>(null);
+  const [styles, setStyles] = useState<Style[]>([]);
+
+  useEffect(() => {
+    if (novelId) {
+      api.listStyles(novelId).then(setStyles).catch(console.error);
+    }
+  }, [novelId]);
 
   // Load knowledge status on mount
   useEffect(() => {
