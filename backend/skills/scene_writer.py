@@ -42,7 +42,11 @@ class SceneWriterSkill(Skill):
     manifest = SCENE_WRITER_MANIFEST
 
     async def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        profile = profile_registry.get(self.manifest.role)
+        # Check for runtime profile override
+        if "_profile_override" in context:
+            profile = context["_profile_override"]
+        else:
+            profile = profile_registry.get(self.manifest.role)
         prompt = render_template(self.manifest.template, context)
 
         messages = [

@@ -1,5 +1,7 @@
 """Skill execution routes."""
 
+from dataclasses import replace
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,9 +26,11 @@ from workflow.chapter_workflow import run_chapter_workflow
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 
-def _apply_profile_override(role: str, override: ProfileOverride) -> None:
-    """Apply runtime profile override to the profile registry."""
-    from dataclasses import replace
+def _apply_profile_override(role: str, override: ProfileOverride) -> ExecutionProfile:
+    """Create a profile with runtime overrides applied.
+
+    Returns a new ExecutionProfile without mutating global state.
+    """
     base_profile = profile_registry.get(role)
     overrides = {}
     if override.provider is not None:
@@ -38,7 +42,8 @@ def _apply_profile_override(role: str, override: ProfileOverride) -> None:
     if override.max_tokens is not None:
         overrides["max_tokens"] = override.max_tokens
     if overrides:
-        profile_registry.register(role, replace(base_profile, **overrides))
+        return replace(base_profile, **overrides)
+    return base_profile
 
 
 @router.get("/providers")
@@ -91,7 +96,9 @@ async def run_scene_writer(
 
     # Apply profile override if provided
     if profile_override:
-        _apply_profile_override(skill.manifest.role, profile_override)
+        context["_profile_override"] = _apply_profile_override(
+            skill.manifest.role, profile_override
+        )
 
     # Build context
     context = await build_scene_writer_context(db, scene)

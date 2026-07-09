@@ -10,8 +10,10 @@ import logging
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import replace
 from typing import Any, Type
 
+import httpx
 import yaml
 from openai import AsyncOpenAI
 
@@ -161,8 +163,6 @@ class OllamaNativeAdapter(ProviderAdapter):
         messages: list[dict[str, str]],
         profile: ExecutionProfile,
     ) -> str:
-        import httpx
-
         model = profile.model or self._config.default_model
         max_tokens = profile.max_tokens or self._config.default_max_tokens
 
@@ -254,7 +254,6 @@ class ProviderRouter:
 
             try:
                 # Create a modified profile with this provider
-                from dataclasses import replace
                 attempt_profile = replace(profile, provider=provider_name)
                 response = await adapter.chat(messages, attempt_profile)
                 if provider_name != profile.provider:

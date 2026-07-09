@@ -5,6 +5,7 @@ Enables "switch models by changing YAML only" for all skills.
 """
 
 from __future__ import annotations
+import logging
 import os
 from dataclasses import replace
 from typing import Optional
@@ -12,6 +13,9 @@ from typing import Optional
 import yaml
 
 from core.types import ExecutionProfile
+
+
+logger = logging.getLogger(__name__)
 
 
 # Default profiles matching original hardcoded values
@@ -97,10 +101,15 @@ class ProfileRegistry:
         """Get execution profile for a skill role.
 
         Returns the profile if defined, otherwise a default profile.
+        Logs a warning for unknown roles.
         """
         if role in self._profiles:
             return self._profiles[role]
-        # Return default profile for unknown roles
+        # Log warning for unknown roles
+        logger.warning(
+            f"Unknown profile role '{role}'. Returning default profile. "
+            f"Available roles: {', '.join(self.list_profiles())}"
+        )
         return ExecutionProfile()
 
     def list_profiles(self) -> list[str]:
