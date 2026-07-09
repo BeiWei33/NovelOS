@@ -1,13 +1,17 @@
 """
 Provider adapters — bridge between Skill and LLM APIs.
 
-Supports dynamic registration of multiple LLM providers via ProviderConfig.
+Supports dynamic registration of multiple LLM providers via ProviderConfig,
+YAML configuration files, and environment variables.
 """
 
 from __future__ import annotations
+import os
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Type
 
+import yaml
 from openai import AsyncOpenAI
 
 from core.types import ExecutionProfile, ProviderConfig
@@ -29,7 +33,11 @@ class ProviderAdapter(ABC):
 
 
 class OpenAIAdapter(ProviderAdapter):
-    """OpenAI-compatible chat completions."""
+    """OpenAI-compatible chat completions.
+
+    Works with any provider that exposes an OpenAI-compatible API endpoint,
+    including OpenAI, GLM, Ollama, vLLM, and others.
+    """
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
@@ -37,6 +45,11 @@ class OpenAIAdapter(ProviderAdapter):
 
     def _get_client(self) -> AsyncOpenAI:
         if self._client is None:
+            if not self._config.api_key:
+                raise ValueError(
+                    f"API key not configured for provider. "
+                    "Set the appropriate environment variable."
+                )
             kwargs = {"api_key": self._config.api_key}
             if self._config.base_url:
                 kwargs["base_url"] = self._config.base_url
@@ -48,12 +61,6 @@ class OpenAIAdapter(ProviderAdapter):
         messages: list[dict[str, str]],
         profile: ExecutionProfile,
     ) -> str:
-        if not self._config.api_key:
-            raise ValueError(
-                f"API key not configured for provider. "
-                "Set OPENAI_API_KEY environment variable."
-            )
-
         client = self._get_client()
         model = profile.model or self._config.default_model
         max_tokens = profile.max_tokens or self._config.default_max_tokens
@@ -111,14 +118,82 @@ class ProviderRouter:
 router = ProviderRouter()
 
 
-def init_providers() -> None:
-    """Initialize providers from environment variables.
+def _load_yaml_providers(yaml_path: str) -> dict[str, ProviderConfig]:
+    """Load provider configurations from a YAML file."""
+    if not os.path.exists(yaml_path):
+        return {}
 
-    Called once at application startup.
+    with open(yaml_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    if not data or "providers" not in data:
+        return {}
+
+    providers: dict[str, ProviderConfig] = {}
+    for name, cfg in data["providers"].items():
+        if not isinstance(cfg, dict):
+            continue
+        api_key = cfg.get("api_key", "")
+        # Resolve ${VAR} references
+        api_key = _resolve_env_ref(api_key)
+        base_url = cfg.get("base_url", "")
+        if not base_url:
+            raise ValueError(f"Provider '{name}': base_url is required")
+        providers[name] = ProviderConfig(
+            api_key=api_key,
+            base_url=base_url,
+            default_model=cfg.get("default_model", "gpt-4o"),
+            default_max_tokens=cfg.get("default_max_tokens", 2048),
+        )
+    return providers
+
+
+def _load_env_providers() -> dict[str, ProviderConfig]:
+    """Load provider configurations from environment variables.
+
+    Looks for PROVIDER_<NAME>_BASE_URL, PROVIDER_<NAME>_API_KEY, etc.
+    """
+    providers: dict[str, ProviderConfig] = {}
+    pattern = re.compile(r"^PROVIDER_([A-Z][A-Z0-9_]*)_BASE_URL$")
+
+    for key, value in os.environ.items():
+        m = pattern.match(key)
+        if not m or not value:
+            continue
+        name = m.group(1).lower()
+        api_key = os.environ.get(f"PROVIDER_{m.group(1)}_API_KEY", "")
+        default_model = os.environ.get(
+            f"PROVIDER_{m.group(1)}_DEFAULT_MODEL", "gpt-4o"
+        )
+        default_max_tokens = int(
+            os.environ.get(f"PROVIDER_{m.group(1)}_DEFAULT_MAX_TOKENS", "2048")
+        )
+        providers[name] = ProviderConfig(
+            api_key=api_key,
+            base_url=value,
+            default_model=default_model,
+            default_max_tokens=default_max_tokens,
+        )
+    return providers
+
+
+def _resolve_env_ref(value: str) -> str:
+    """Resolve ${VAR} references in a string value."""
+    pattern = re.compile(r"\$\{([^}]+)\}")
+    return pattern.sub(lambda m: os.environ.get(m.group(1), m.group(0)), value)
+
+
+def init_providers() -> None:
+    """Initialize providers from environment variables and YAML config.
+
+    Called once at application startup. Order of precedence:
+    1. Hard-coded providers (OpenAI, GLM) from env vars
+    2. YAML providers from providers.yaml
+    3. Environment-driven providers (PROVIDER_<NAME>_BASE_URL)
     """
     from core.config import settings
 
-    # Register OpenAI provider
+    # 1. Register hard-coded providers from settings
     if settings.OPENAI_API_KEY:
         openai_config = ProviderConfig(
             api_key=settings.OPENAI_API_KEY,
@@ -128,7 +203,6 @@ def init_providers() -> None:
         )
         router.register("openai", OpenAIAdapter, openai_config)
 
-    # Register GLM-5.2 provider (GLM API compatible)
     if settings.GLM_API_KEY:
         glm_config = ProviderConfig(
             api_key=settings.GLM_API_KEY,
@@ -137,3 +211,19 @@ def init_providers() -> None:
             default_max_tokens=4096,
         )
         router.register("glm", OpenAIAdapter, glm_config)
+
+    # 2. Load YAML-configured providers
+    yaml_path = os.environ.get(
+        "PROVIDERS_YAML_PATH",
+        os.path.join(os.path.dirname(__file__), "..", "providers.yaml"),
+    )
+    yaml_providers = _load_yaml_providers(yaml_path)
+    for name, config in yaml_providers.items():
+        if name not in router.list_providers():
+            router.register(name, OpenAIAdapter, config)
+
+    # 3. Load environment-driven providers
+    env_providers = _load_env_providers()
+    for name, config in env_providers.items():
+        if name not in router.list_providers():
+            router.register(name, OpenAIAdapter, config)

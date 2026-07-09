@@ -1,0 +1,34 @@
+# Example providers.yaml
+# Copy this file to backend/providers.yaml and customize
+#
+# This file allows you to register additional OpenAI-compatible LLM providers.
+# Providers defined here will be automatically registered at startup.
+
+providers:
+  # Example: Local Ollama server
+  # ollama:
+  #   base_url: http://localhost:11434/v1
+  #   api_key: ollama  # Ollama doesn't require a real API key
+  #   default_model: llama3
+  #   default_max_tokens: 4096
+
+  # Example: Moonshot AI (Kimi)
+  # moonshot:
+  #   base_url: https://api.moonshot.cn/v1
+  #   api_key: ${MOONSHOT_API_KEY}  # Use env var reference
+  #   default_model: moonshot-v1-8k
+  #   default_max_tokens: 8192
+
+  # Example: Qwen (通义千问) via DashScope
+  # qwen:
+  #   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  #   api_key: ${DASHSCOPE_API_KEY}
+  #   default_model: qwen-turbo
+  #   default_max_tokens: 4096
+
+  # Example: vLLM self-hosted
+  # vllm:
+  #   base_url: http://localhost:8000/v1
+  #   api_key: token-abc123
+  #   default_model: meta-llama/Llama-3-8b-chat
+  #   default_max_tokens: 4096
