@@ -1,6 +1,6 @@
 ---
 title: 左侧导航树
-status: open
+status: done
 labels:
   - ready-for-human
 created: 2026-07-09

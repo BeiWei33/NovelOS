@@ -1,6 +1,6 @@
 ---
 title: 场景规划编辑器
-status: open
+status: done
 labels:
   - ready-for-agent
 created: 2026-07-09

@@ -1,6 +1,6 @@
 ---
 title: Character 详情编辑页面
-status: open
+status: done
 labels:
   - ready-for-human
 created: 2026-07-09
