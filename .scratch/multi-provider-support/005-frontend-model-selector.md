@@ -1,9 +1,10 @@
 ---
 title: 前端模型选择 UI
-status: open
+status: done
 labels:
-  - ready-for-human
+  - ready-for-agent
 created: 2026-07-09
+completed: 2026-07-09
 ---
 
 ## What to build

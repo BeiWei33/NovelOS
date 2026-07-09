@@ -9,9 +9,14 @@ from skills.base import registry
 from skills.scene_writer import build_scene_writer_context
 from skills.consistency_checker import build_consistency_checker_context
 from skills.story_planner import build_story_planner_context
-from core.types import ScenePipelineResult
+from skills.providers import router as provider_router
+from skills.profile_registry import profile_registry
+from core.types import ScenePipelineResult, ExecutionProfile
 from api.crud import update_scene
-from api.schemas import SceneUpdate, SceneDocument, ScenePlanningInput
+from api.schemas import (
+    SceneUpdate, SceneDocument, ScenePlanningInput,
+    ProfileOverride, ProviderInfo, ProfileInfo,
+)
 from workflow.quality_pipeline import run_quality_pipeline, apply_patches
 from workflow.chapter_workflow import run_chapter_workflow
 
@@ -19,9 +24,58 @@ from workflow.chapter_workflow import run_chapter_workflow
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 
+def _apply_profile_override(role: str, override: ProfileOverride) -> None:
+    """Apply runtime profile override to the profile registry."""
+    from dataclasses import replace
+    base_profile = profile_registry.get(role)
+    overrides = {}
+    if override.provider is not None:
+        overrides["provider"] = override.provider
+    if override.model is not None:
+        overrides["model"] = override.model
+    if override.temperature is not None:
+        overrides["temperature"] = override.temperature
+    if override.max_tokens is not None:
+        overrides["max_tokens"] = override.max_tokens
+    if overrides:
+        profile_registry.register(role, replace(base_profile, **overrides))
+
+
+@router.get("/providers")
+async def list_providers():
+    """List all registered LLM providers."""
+    providers = []
+    for name in provider_router.list_providers():
+        config = provider_router.get_config(name)
+        if config:
+            providers.append(ProviderInfo(
+                name=name,
+                default_model=config.default_model,
+                default_max_tokens=config.default_max_tokens,
+            ))
+    return {"providers": providers}
+
+
+@router.get("/profiles")
+async def list_profiles():
+    """List all execution profiles."""
+    profiles = []
+    for role in profile_registry.list_profiles():
+        profile = profile_registry.get(role)
+        profiles.append(ProfileInfo(
+            role=role,
+            provider=profile.provider,
+            model=profile.model,
+            temperature=profile.temperature,
+            max_tokens=profile.max_tokens,
+        ))
+    return {"profiles": profiles}
+
+
 @router.post("/scene-writer/{scene_id}")
 async def run_scene_writer(
     scene_id: str,
+    profile_override: ProfileOverride | None = None,
     db: AsyncSession = Depends(get_session),
 ):
     """Execute SceneWriter skill on a scene. Assembles context, calls LLM, writes result."""
@@ -34,6 +88,10 @@ async def run_scene_writer(
     skill = registry.get("SceneWriter")
     if skill is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="SceneWriter skill not registered")
+
+    # Apply profile override if provided
+    if profile_override:
+        _apply_profile_override(skill.manifest.role, profile_override)
 
     # Build context
     context = await build_scene_writer_context(db, scene)

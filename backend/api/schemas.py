@@ -170,3 +170,31 @@ class StyleUpdate(BaseModel):
 class ScenePlanningInput(BaseModel):
     goal: str = ""
     theme: str = ""
+
+
+# ─── Profile Override ───────────────────────────────────────────────────────────
+
+class ProfileOverride(BaseModel):
+    """Runtime profile override for skill execution."""
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(None, ge=1, le=128000)
+
+
+# ─── Provider/Profile Info ──────────────────────────────────────────────────────
+
+class ProviderInfo(BaseModel):
+    """Information about a registered provider."""
+    name: str
+    default_model: str
+    default_max_tokens: int
+
+
+class ProfileInfo(BaseModel):
+    """Information about an execution profile."""
+    role: str
+    provider: str
+    model: str
+    temperature: float
+    max_tokens: int
